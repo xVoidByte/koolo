@@ -76,7 +76,7 @@ var RunAreas = map[Run][]area.ID{
 	ArachnidLairRun:     {area.SpiderForest, area.SpiderCave, area.SpiderCavern},
 	BaalRun:             {area.ThroneOfDestruction, area.TheWorldStoneKeepLevel1, area.TheWorldStoneKeepLevel2, area.TheWorldStoneKeepLevel3, area.TheWorldstoneChamber},
 	CountessRun:         {area.BlackMarsh, area.ForgottenTower, area.TowerCellarLevel1, area.TowerCellarLevel2, area.TowerCellarLevel3, area.TowerCellarLevel4, area.TowerCellarLevel5},
-	CowsRun:             {area.MooMooFarm},
+	CowsRun:             {area.StonyField, area.Tristram, area.MooMooFarm},
 	DiabloRun:           {area.CityOfTheDamned, area.RiverOfFlame, area.ChaosSanctuary},
 	DrifterCavernRun:    {area.GlacialTrail, area.DrifterCavern},
 	DurielRun:           {area.CanyonOfTheMagi, area.TalRashasTomb1, area.TalRashasTomb2, area.TalRashasTomb3, area.TalRashasTomb4, area.TalRashasTomb5, area.TalRashasTomb6, area.TalRashasTomb7, area.DurielsLair},
