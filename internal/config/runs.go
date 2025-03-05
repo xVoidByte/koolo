@@ -84,7 +84,7 @@ var RunAreas = map[Run][]area.ID{
 	LowerKurastRun:    {area.LowerKurast},
 	StonyTombRun:      {area.StonyTombLevel1, area.StonyTombLevel2},
 	PitRun:            {area.PitLevel1, area.PitLevel2},
-	ArachnidLairRun:   {area.SpiderCave, area.SpiderCavern},
+	ArachnidLairRun:   {area.SpiderCave, area.SpiderCavern, area.SpiderForest},
 	TalRashaTombsRun:  {area.TalRashasTomb1, area.TalRashasTomb2, area.TalRashasTomb3, area.TalRashasTomb4, area.TalRashasTomb5, area.TalRashasTomb6, area.TalRashasTomb7},
 	BaalRun:           {area.ThroneOfDestruction, area.TheWorldstoneChamber},
 	DiabloRun:         {area.ChaosSanctuary},
