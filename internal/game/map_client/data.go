@@ -1,33 +1,33 @@
 package map_client
 
-type serverLevel struct {
+type ServerLevel struct {
 	Type   string         `json:"type"`
 	ID     int            `json:"id"`
 	Name   string         `json:"name"`
-	Offset serverPosition `json:"offset"`
+	Offset ServerPosition `json:"offset"`
 	Size   struct {
 		Width  int `json:"width"`
 		Height int `json:"height"`
 	} `json:"size"`
-	Objects []serverObject `json:"objects"`
-	Rooms   []serverRoom   `json:"rooms"`
+	Objects []ServerObject `json:"objects"`
+	Rooms   []ServerRoom   `json:"rooms"`
 	Map     [][]int
 }
 
-type serverPosition struct {
+type ServerPosition struct {
 	X int `json:"x"`
 	Y int `json:"y"`
 }
 
-type serverObject struct {
+type ServerObject struct {
 	ID   int    `json:"id"`
 	Type string `json:"type"`
 	Name string `json:"name"`
-	serverPosition
+	ServerPosition
 }
 
-type serverRoom struct {
-	serverPosition
+type ServerRoom struct {
+	ServerPosition
 	Width  int `json:"width"`
 	Height int `json:"height"`
 }
