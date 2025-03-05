@@ -70,29 +70,29 @@ var AvailableRuns = map[Run]interface{}{
 
 // In case of future area development, each area must be specified with it's corresponding area as Waypoint -> Destination -> Final Point
 // Example: If character is configured to run Mausoleum:
-// heads to area.ColdPlains (Waypoint) first -> teleports/walks to BurialGrounds (Destination) -> enters Mausoleum (Final Point)
+// Heads to area.ColdPlains (Waypoint) first -> teleports/walks to BurialGrounds (Destination) -> enters Mausoleum (Final Point)
 var RunAreas = map[Run][]area.ID{
 	AncientTunnelsRun:   {area.AncientTunnels, area.LostCity},
 	ArachnidLairRun:     {area.SpiderForest, area.SpiderCave, area.SpiderCavern},
 	BaalRun:             {area.ThroneOfDestruction, area.TheWorldStoneKeepLevel1, area.TheWorldStoneKeepLevel2, area.TheWorldStoneKeepLevel3, area.TheWorldstoneChamber},
-	CountessRun:         {area.BlackMarsh, area.TowerCellarLevel1, area.TowerCellarLevel2, area.TowerCellarLevel3, area.TowerCellarLevel4, area.TowerCellarLevel5},
+	CountessRun:         {area.BlackMarsh, area.ForgottenTower, area.TowerCellarLevel1, area.TowerCellarLevel2, area.TowerCellarLevel3, area.TowerCellarLevel4, area.TowerCellarLevel5},
 	CowsRun:             {area.MooMooFarm},
-	DiabloRun:           {area.RiverOfFlame, area.ChaosSanctuary},
+	DiabloRun:           {area.CityOfTheDamned, area.RiverOfFlame, area.ChaosSanctuary},
 	DrifterCavernRun:    {area.GlacialTrail, area.DrifterCavern},
 	DurielRun:           {area.CanyonOfTheMagi, area.TalRashasTomb1, area.TalRashasTomb2, area.TalRashasTomb3, area.TalRashasTomb4, area.TalRashasTomb5, area.TalRashasTomb6, area.TalRashasTomb7, area.DurielsLair},
-	EldritchRun:         {area.FrigidHighlands},
+	EldritchRun:         {area.FrigidHighlands, area.BloodyFoothills}, // Kill Shenk option does NOT work PROBLEMATIC
 	EnduguRun:           {area.FlayerJungle, area.FlayerDungeonLevel1, area.FlayerDungeonLevel2, area.FlayerDungeonLevel3},
 	LevelingRun:         {}, // Special case - handled through leveling logic
 	LowerKurastRun:      {area.LowerKurast},
-	LowerKurastChestRun: {area.LowerKurast}, // Same area but different handling
-	MausoleumRun:        {area.ColdPlains, area.BurialGrounds, area.Mausoleum},
+	LowerKurastChestRun: {area.LowerKurast},                                    // Same area but different handling
+	MausoleumRun:        {area.ColdPlains, area.BurialGrounds, area.Mausoleum}, // PROBLEMATIC
 	MephistoRun:         {area.DuranceOfHateLevel2, area.DuranceOfHateLevel3},
 	NihlathakRun:        {area.HallsOfPain, area.HallsOfVaught},
 	PindleskinRun:       {area.NihlathaksTemple},
-	PitRun:              {area.BlackMarsh, area.OuterCloister, area.TamoeHighland, area.PitLevel1, area.PitLevel2},
-	QuestsRun:           {}, // Special case - handled through quest tracking
+	PitRun:              {area.BlackMarsh, area.TamoeHighland, area.OuterCloister, area.PitLevel1, area.PitLevel2}, // PROBLEMATIC
+	QuestsRun:           {},                                                                                        // Special case - handled through quest tracking
 	SpiderCavernRun:     {area.SpiderForest, area.SpiderCavern},
-	StonyTombRun:        {area.DryHills, area.RockyWaste, area.StonyTombLevel1, area.StonyTombLevel2},
+	StonyTombRun:        {area.DryHills, area.RockyWaste, area.StonyTombLevel1, area.StonyTombLevel2}, // PROBLEMATIC
 	SummonerRun:         {area.ArcaneSanctuary},
 	TalRashaTombsRun:    {area.CanyonOfTheMagi, area.TalRashasTomb1, area.TalRashasTomb2, area.TalRashasTomb3, area.TalRashasTomb4, area.TalRashasTomb5, area.TalRashasTomb6, area.TalRashasTomb7},
 	TerrorZoneRun:       {},                                                              // Handled dynamically through TerrorZone config
