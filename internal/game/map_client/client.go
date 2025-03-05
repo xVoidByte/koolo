@@ -25,9 +25,9 @@ func GetMapData(seed string, difficulty difficulty.Difficulty) (MapData, error) 
 
 	stdoutLines := strings.Split(string(stdout), "\r\n")
 
-	lvls := make([]serverLevel, 0)
+	lvls := make([]ServerLevel, 0)
 	for _, line := range stdoutLines {
-		var lvl serverLevel
+		var lvl ServerLevel
 		err = json.Unmarshal([]byte(line), &lvl)
 		// Discard empty lines or lines that don't contain level information
 		if err == nil && lvl.Type != "" && len(lvl.Map) > 0 {
@@ -51,9 +51,9 @@ func getDifficultyAsNum(df difficulty.Difficulty) string {
 	return "0"
 }
 
-type MapData []serverLevel
+type MapData []ServerLevel
 
-func (lvl serverLevel) CollisionGrid() [][]bool {
+func (lvl ServerLevel) CollisionGrid() [][]bool {
 	var cg [][]bool
 
 	for y := 0; y < lvl.Size.Height; y++ {
@@ -88,7 +88,7 @@ func (lvl serverLevel) CollisionGrid() [][]bool {
 	return cg
 }
 
-func (lvl serverLevel) NPCsExitsAndObjects() (data.NPCs, []data.Level, []data.Object, []data.Room) {
+func (lvl ServerLevel) NPCsExitsAndObjects() (data.NPCs, []data.Level, []data.Object, []data.Room) {
 	var npcs []data.NPC
 	var exits []data.Level
 	var objects []data.Object
