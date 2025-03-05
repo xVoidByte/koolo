@@ -89,8 +89,8 @@ var RunAreas = map[Run][]area.ID{
 	MephistoRun:         {area.DuranceOfHateLevel2, area.DuranceOfHateLevel3},
 	NihlathakRun:        {area.HallsOfPain, area.HallsOfVaught},
 	PindleskinRun:       {area.NihlathaksTemple},
-	PitRun:              {area.BlackMarsh, area.TamoeHighland, area.OuterCloister, area.PitLevel1, area.PitLevel2}, // PROBLEMATIC
-	QuestsRun:           {},                                                                                        // Special case - handled through quest tracking
+	PitRun:              {area.BlackMarsh, area.MonasteryGate, area.TamoeHighland, area.OuterCloister, area.PitLevel1, area.PitLevel2}, // PROBLEMATIC - Move via Black Marsh
+	QuestsRun:           {},                                                                                                            // Special case - handled through quest tracking
 	SpiderCavernRun:     {area.SpiderForest, area.SpiderCavern},
 	StonyTombRun:        {area.DryHills, area.RockyWaste, area.StonyTombLevel1, area.StonyTombLevel2}, // PROBLEMATIC
 	SummonerRun:         {area.ArcaneSanctuary},
