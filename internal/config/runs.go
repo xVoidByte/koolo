@@ -68,33 +68,36 @@ var AvailableRuns = map[Run]interface{}{
 	EnduguRun:           nil,
 }
 
+// In case of future area development, each area must be specified with it's corresponding area as Waypoint -> Destination -> Final Point
+// Example: If character is configured to run Mausoleum:
+// heads to area.ColdPlains (Waypoint) first -> teleports/walks to BurialGrounds (Destination) -> enters Mausoleum (Final Point)
 var RunAreas = map[Run][]area.ID{
-	AncientTunnelsRun:   {area.AncientTunnels},
+	AncientTunnelsRun:   {area.AncientTunnels, area.LostCity},
 	ArachnidLairRun:     {area.SpiderForest, area.SpiderCave, area.SpiderCavern},
-	BaalRun:             {area.ThroneOfDestruction, area.TheWorldstoneChamber},
-	CountessRun:         {area.TowerCellarLevel1, area.TowerCellarLevel2, area.TowerCellarLevel3, area.TowerCellarLevel4, area.TowerCellarLevel5},
+	BaalRun:             {area.ThroneOfDestruction, area.TheWorldStoneKeepLevel1, area.TheWorldStoneKeepLevel2, area.TheWorldStoneKeepLevel3, area.TheWorldstoneChamber},
+	CountessRun:         {area.BlackMarsh, area.TowerCellarLevel1, area.TowerCellarLevel2, area.TowerCellarLevel3, area.TowerCellarLevel4, area.TowerCellarLevel5},
 	CowsRun:             {area.MooMooFarm},
-	DiabloRun:           {area.ChaosSanctuary},
-	DrifterCavernRun:    {area.DrifterCavern},
-	DurielRun:           {area.DurielsLair},
+	DiabloRun:           {area.RiverOfFlame, area.ChaosSanctuary},
+	DrifterCavernRun:    {area.GlacialTrail, area.DrifterCavern},
+	DurielRun:           {area.CanyonOfTheMagi, area.TalRashasTomb1, area.TalRashasTomb2, area.TalRashasTomb3, area.TalRashasTomb4, area.TalRashasTomb5, area.TalRashasTomb6, area.TalRashasTomb7, area.DurielsLair},
 	EldritchRun:         {area.FrigidHighlands},
-	EnduguRun:           {area.FlayerJungle},
+	EnduguRun:           {area.FlayerJungle, area.FlayerDungeonLevel1, area.FlayerDungeonLevel2, area.FlayerDungeonLevel3},
 	LevelingRun:         {}, // Special case - handled through leveling logic
 	LowerKurastRun:      {area.LowerKurast},
 	LowerKurastChestRun: {area.LowerKurast}, // Same area but different handling
-	MausoleumRun:        {area.Mausoleum},
-	MephistoRun:         {area.DuranceOfHateLevel3},
-	NihlathakRun:        {area.HallsOfAnguish, area.HallsOfPain, area.HallsOfVaught},
+	MausoleumRun:        {area.ColdPlains, area.BurialGrounds, area.Mausoleum},
+	MephistoRun:         {area.DuranceOfHateLevel2, area.DuranceOfHateLevel3},
+	NihlathakRun:        {area.HallsOfPain, area.HallsOfVaught},
 	PindleskinRun:       {area.NihlathaksTemple},
-	PitRun:              {area.PitLevel1, area.PitLevel2},
+	PitRun:              {area.BlackMarsh, area.OuterCloister, area.TamoeHighland, area.PitLevel1, area.PitLevel2},
 	QuestsRun:           {}, // Special case - handled through quest tracking
-	SpiderCavernRun:     {area.SpiderCavern},
-	StonyTombRun:        {area.StonyTombLevel1, area.StonyTombLevel2},
+	SpiderCavernRun:     {area.SpiderForest, area.SpiderCavern},
+	StonyTombRun:        {area.DryHills, area.RockyWaste, area.StonyTombLevel1, area.StonyTombLevel2},
 	SummonerRun:         {area.ArcaneSanctuary},
-	TalRashaTombsRun:    {area.TalRashasTomb1, area.TalRashasTomb2, area.TalRashasTomb3, area.TalRashasTomb4, area.TalRashasTomb5, area.TalRashasTomb6, area.TalRashasTomb7},
-	TerrorZoneRun:       {},                 // Handled dynamically through TerrorZone config
-	ThreshsocketRun:     {area.DisusedFane},
+	TalRashaTombsRun:    {area.CanyonOfTheMagi, area.TalRashasTomb1, area.TalRashasTomb2, area.TalRashasTomb3, area.TalRashasTomb4, area.TalRashasTomb5, area.TalRashasTomb6, area.TalRashasTomb7},
+	TerrorZoneRun:       {},                                                              // Handled dynamically through TerrorZone config
+	ThreshsocketRun:     {area.ArreatPlateau, area.DisusedFane, area.CrystallinePassage}, // Verify exact area
 	TravincalRun:        {area.Travincal},
-	TristramRun:         {area.Tristram},
+	TristramRun:         {area.ColdPlains, area.StonyField, area.Tristram}, // Cold Plains is added if char misses waypoint and teleports to Tristram
 	AndarielRun:         {area.CatacombsLevel1, area.CatacombsLevel2, area.CatacombsLevel3, area.CatacombsLevel4},
 }
