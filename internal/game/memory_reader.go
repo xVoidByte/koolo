@@ -15,7 +15,7 @@ import (
 	"github.com/hectorgimenez/koolo/internal/config"
 	"github.com/hectorgimenez/koolo/internal/game/map_client"
 	"github.com/lxn/win"
-	"golang.org/x/sync/errgroup"
+	//"golang.org/x/sync/errgroup"
 )
 
 type MemoryReader struct {
@@ -55,8 +55,45 @@ func (gd *MemoryReader) MapSeed() uint {
 	return gd.mapSeed
 }
 
+func (gd *MemoryReader) getRequiredAreas() map[area.ID]bool {
+	required := make(map[area.ID]bool)
+
+	// Always include all town areas
+	required[area.RogueEncampment] = true
+	required[area.LutGholein] = true
+	required[area.KurastDocks] = true
+	required[area.ThePandemoniumFortress] = true
+	required[area.Harrogath] = true
+
+	if gd.cfg == nil {
+		return required
+	}
+
+	// Add areas for each configured run
+	for _, run := range gd.cfg.Game.Runs {
+		// Handle terror zone areas separately
+		if run == config.TerrorZoneRun {
+			for _, a := range gd.cfg.Game.TerrorZone.Areas {
+				required[area.ID(a)] = true
+			}
+			continue
+		}
+
+		// Get areas from centralized configuration
+		if areas, exists := config.RunAreas[run]; exists {
+			for _, a := range areas {
+				required[a] = true
+			}
+		}
+	}
+
+	gd.logger.Debug("Computed required areas", slog.Any("areas", required))
+	return required
+}
+
 func (gd *MemoryReader) FetchMapData() error {
 	d := gd.GameReader.GetData()
+	currentAreaID := d.PlayerUnit.Area
 	gd.mapSeed, _ = gd.getMapSeed(d.PlayerUnit.Address)
 	t := time.Now()
 	gd.logger.Debug("Fetching map data...", slog.Uint64("seed", uint64(gd.mapSeed)), slog.String("difficulty", string(config.Characters[gd.supervisorName].Game.Difficulty)))
@@ -66,51 +103,80 @@ func (gd *MemoryReader) FetchMapData() error {
 		return fmt.Errorf("error fetching map data: %w", err)
 	}
 
+	requiredAreas := gd.getRequiredAreas()
 	areas := make(map[area.ID]AreaData)
 	var mu sync.Mutex
-	g := errgroup.Group{}
+	var wg sync.WaitGroup
+
+	gd.logger.Debug("Processing map data",
+		slog.Int("total_areas", len(mapData)),
+		slog.Int("required_areas", len(requiredAreas)),
+		slog.Any("required", requiredAreas),
+	)
+
 	for _, lvl := range mapData {
-		g.Go(func() error {
-			cg := lvl.CollisionGrid()
-			resultGrid := make([][]CollisionType, lvl.Size.Height)
-			for i := range resultGrid {
-				resultGrid[i] = make([]CollisionType, lvl.Size.Width)
-			}
+		lvl := lvl // Capture loop variable
+		areaID := area.ID(lvl.ID)
+		if !requiredAreas[areaID] {
+			gd.logger.Debug("Skipping unrequired area",
+				slog.String("name", lvl.Name),
+				slog.Int("id", lvl.ID),
+			)
+			continue // Skip non-required areas
+		}
 
-			for y := 0; y < lvl.Size.Height; y++ {
-				for x := 0; x < lvl.Size.Width; x++ {
-					if cg[y][x] {
-						resultGrid[y][x] = CollisionTypeWalkable
-					} else {
-						resultGrid[y][x] = CollisionTypeNonWalkable
-					}
-				}
-			}
-
-			npcs, exits, objects, rooms := lvl.NPCsExitsAndObjects()
-			grid := NewGrid(resultGrid, lvl.Offset.X, lvl.Offset.Y)
-			mu.Lock()
-			areas[area.ID(lvl.ID)] = AreaData{
-				Area:           area.ID(lvl.ID),
-				Name:           lvl.Name,
-				NPCs:           npcs,
-				AdjacentLevels: exits,
-				Objects:        objects,
-				Rooms:          rooms,
-				Grid:           grid,
-			}
-			mu.Unlock()
-
-			return nil
-		})
+		if areaID == currentAreaID {
+			// Process current area synchronously
+			processLevel(lvl, areas, &mu)
+		} else {
+			// Process other areas in goroutines
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				processLevel(lvl, areas, &mu)
+			}()
+		}
 	}
 
-	_ = g.Wait()
+	wg.Wait() // Wait for all background goroutines to finish
 
 	gd.cachedMapData = areas
 	gd.logger.Debug("Fetch completed", slog.Int64("ms", time.Since(t).Milliseconds()))
-
 	return nil
+}
+
+// Helper function to process a single level's data
+func processLevel(lvl map_client.ServerLevel, areas map[area.ID]AreaData, mu *sync.Mutex) {
+	cg := lvl.CollisionGrid()
+	resultGrid := make([][]CollisionType, lvl.Size.Height)
+	for i := range resultGrid {
+		resultGrid[i] = make([]CollisionType, lvl.Size.Width)
+	}
+
+	for y := 0; y < lvl.Size.Height; y++ {
+		for x := 0; x < lvl.Size.Width; x++ {
+			if cg[y][x] {
+				resultGrid[y][x] = CollisionTypeWalkable
+			} else {
+				resultGrid[y][x] = CollisionTypeNonWalkable
+			}
+		}
+	}
+
+	npcs, exits, objects, rooms := lvl.NPCsExitsAndObjects()
+	grid := NewGrid(resultGrid, lvl.Offset.X, lvl.Offset.Y)
+
+	mu.Lock()
+	areas[area.ID(lvl.ID)] = AreaData{
+		Area:           area.ID(lvl.ID),
+		Name:           lvl.Name,
+		NPCs:           npcs,
+		AdjacentLevels: exits,
+		Objects:        objects,
+		Rooms:          rooms,
+		Grid:           grid,
+	}
+	mu.Unlock()
 }
 
 func (gd *MemoryReader) updateWindowPositionData() {
