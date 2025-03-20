@@ -3,7 +3,6 @@ package character
 import (
 	"fmt"
 	"log/slog"
-	"sort"
 	"time"
 
 	"github.com/hectorgimenez/d2go/pkg/data/mode"
@@ -57,8 +56,9 @@ func (s WindDruid) waitForCastComplete() bool {
 	for time.Since(startTime) < castingTimeout {
 		ctx.RefreshGameData()
 
-		if ctx.Data.PlayerUnit.Mode != mode.CastingSkill && // Check if not casting
-			time.Since(s.lastCastTime) > 150*time.Millisecond { // Ensure enough time has passed
+		// Check if we're no longer casting and enough time has passed since last cast
+		if ctx.Data.PlayerUnit.Mode != mode.CastingSkill &&
+			time.Since(s.lastCastTime) > 150*time.Millisecond {
 			return true
 		}
 
@@ -74,64 +74,67 @@ func (s WindDruid) KillMonsterSequence(
 	skipOnImmunities []stat.Resist, // Resistances to skip if monster is immune
 ) error {
 	ctx := context.Get()
-	lastRefresh := time.Now()
 	completedAttackLoops := 0
-	var currentTargetID data.UnitID
-
-	defer func() { // Ensures Tornado is set as active skill on exit
-		if kb, found := ctx.Data.KeyBindings.KeyBindingForSkill(skill.Tornado); found {
-			ctx.HID.PressKeyBinding(kb)
-		}
-	}()
+	previousUnitID := 0
+	lastBuffCheck := time.Now()
 
 	attackOpts := []step.AttackOption{
 		step.StationaryDistance(druMinDistance, druMaxDistance), // Maintains distance range
 	}
 
+	// Ensure we always return to Tornado when done
+	defer func() {
+		if kb, found := ctx.Data.KeyBindings.KeyBindingForSkill(skill.Tornado); found {
+			ctx.HID.PressKeyBinding(kb)
+		}
+	}()
+
 	for {
-		if time.Since(lastRefresh) > time.Millisecond*100 {
+		// Refresh game data every 100ms like Sorceress implementation
+		if time.Since(lastBuffCheck) > 100*time.Millisecond {
 			ctx.RefreshGameData()
-			lastRefresh = time.Now()
+			lastBuffCheck = time.Now()
 		}
 
 		ctx.PauseIfNotPriority() // Pause if not the priority task
+
+		id, found := monsterSelector(*s.Data)
+		if !found {
+			return nil
+		}
+		if previousUnitID != int(id) {
+			completedAttackLoops = 0
+		}
 
 		if completedAttackLoops >= druMaxAttacksLoop {
 			return nil // Exit if max attack loops reached
 		}
 
-		if currentTargetID == 0 { // Select a new target if none exists
-			id, found := monsterSelector(*s.Data)
-			if !found {
-				return nil // Exit if no target found
-			}
-			currentTargetID = id
-		}
-
-		monster, found := s.Data.Monsters.FindByID(currentTargetID)
-		if !found || monster.Stats[stat.Life] <= 0 { // Check if target is dead or missing
-			currentTargetID = 0
-			continue
-		}
-
-		if !s.preBattleChecks(currentTargetID, skipOnImmunities) { // Perform pre-combat checks
+		monster, found := s.Data.Monsters.FindByID(id)
+		if !found {
+			s.Logger.Info("Monster not found", slog.String("monster", fmt.Sprintf("%v", monster)))
 			return nil
 		}
 
 		s.RecastBuffs() // Refresh buffs before attacking
 
+		if !s.preBattleChecks(id, skipOnImmunities) { // Perform pre-combat checks
+			return nil
+		}
+
+		// Tornado attack sequence
 		if kb, found := ctx.Data.KeyBindings.KeyBindingForSkill(skill.Tornado); found {
 			ctx.HID.PressKeyBinding(kb) // Set Tornado as active skill
-			if err := step.PrimaryAttack(currentTargetID, 1, true, attackOpts...); err == nil {
+			if err := step.PrimaryAttack(id, 1, true, attackOpts...); err == nil {
 				if !s.waitForCastComplete() { // Wait for cast to complete
 					continue
 				}
 				s.lastCastTime = time.Now() // Update last cast time
 				completedAttackLoops++
 			}
-		} else {
-			return fmt.Errorf("tornado skill not bound")
 		}
+
+		previousUnitID = int(id)
 	}
 }
 
@@ -146,19 +149,26 @@ func (s WindDruid) killMonster(npc npc.ID, t data.MonsterType) error {
 	}, nil)
 }
 
-// Reapplies active buffs if they’ve expired
+// Reapplies active buffs if they've expired
 func (s WindDruid) RecastBuffs() {
 	ctx := context.Get()
-	skills := []skill.ID{skill.Hurricane, skill.OakSage, skill.CycloneArmor}
-	states := []state.State{state.Hurricane, state.Oaksage, state.Cyclonearmor}
+	skills := []struct {
+		id    skill.ID
+		state state.State
+	}{
+		{skill.Hurricane, state.Hurricane},
+		{skill.OakSage, state.Oaksage},
+		{skill.CycloneArmor, state.Cyclonearmor},
+	}
 
-	for i, druSkill := range skills {
-		if kb, found := ctx.Data.KeyBindings.KeyBindingForSkill(druSkill); found {
-			if !ctx.Data.PlayerUnit.States.HasState(states[i]) { // Check if buff is missing
-				ctx.HID.PressKeyBinding(kb)             // Activate skill
-				utils.Sleep(180)                        // Small delay
-				s.HID.Click(game.RightButton, 640, 340) // Cast skill at center screen
-				utils.Sleep(100)                        // Delay to ensure cast completes
+	for _, buff := range skills {
+		if kb, found := ctx.Data.KeyBindings.KeyBindingForSkill(buff.id); found {
+			if !ctx.Data.PlayerUnit.States.HasState(buff.state) { // Check if buff is missing
+				// Hurricane requires both key press and right click to activate
+				ctx.HID.PressKeyBinding(kb)               // Activate skill hotkey
+				utils.Sleep(180)                          // Short delay for UI update
+				ctx.HID.Click(game.RightButton, 640, 340) // Cast at screen center
+				utils.Sleep(100)                          // Allow cast animation to complete
 			}
 		}
 	}
@@ -181,59 +191,79 @@ func (s WindDruid) BuffSkills() []skill.ID {
 
 // Dynamically determines pre-combat buffs and summons
 func (s WindDruid) PreCTABuffSkills() []skill.ID {
-	needsBear := true
-	wolves := 5
-	direWolves := 3
-	needsOak := true
-	needsCreeper := true
+	// Initialize default needed counts
+	needs := struct {
+		bear       bool
+		wolves     int
+		direWolves int
+		oak        bool
+		creeper    bool
+	}{
+		bear:       true,
+		wolves:     5,
+		direWolves: 3,
+		oak:        true,
+		creeper:    true,
+	}
 
-	for _, monster := range s.Data.Monsters { // Check existing pets
+	// Scan current pets and adjust needed counts
+	for _, monster := range s.Data.Monsters {
 		if monster.IsPet() {
 			switch monster.Name {
 			case npc.DruBear:
-				needsBear = false
+				needs.bear = false
 			case npc.DruFenris:
-				direWolves--
+				needs.direWolves = max(0, needs.direWolves-1)
 			case npc.DruSpiritWolf:
-				wolves--
+				needs.wolves = max(0, needs.wolves-1)
 			case npc.OakSage:
-				needsOak = false
+				needs.oak = false
 			case npc.DruCycleOfLife, npc.VineCreature, npc.DruPlaguePoppy:
-				needsCreeper = false
+				needs.creeper = false
 			}
 		}
 	}
 
-	skills := make([]skill.ID, 0)
+	// Check active oak sage state
 	if s.Data.PlayerUnit.States.HasState(state.Oaksage) {
-		needsOak = false
+		needs.oak = false
 	}
 
+	skills := make([]skill.ID, 0)
+
 	// Add summoning skills based on need and key bindings
-	if _, found := s.Data.KeyBindings.KeyBindingForSkill(skill.SummonSpiritWolf); found {
-		for i := 0; i < wolves; i++ {
+	if _, found := s.Data.KeyBindings.KeyBindingForSkill(skill.SummonSpiritWolf); found && needs.wolves > 0 {
+		for i := 0; i < needs.wolves; i++ {
 			skills = append(skills, skill.SummonSpiritWolf)
 		}
 	}
-	if _, found := s.Data.KeyBindings.KeyBindingForSkill(skill.SummonDireWolf); found {
-		for i := 0; i < direWolves; i++ {
+
+	// Add missing dire wolves (only needed quantity)
+	if _, found := s.Data.KeyBindings.KeyBindingForSkill(skill.SummonDireWolf); found && needs.direWolves > 0 {
+		for i := 0; i < needs.direWolves; i++ {
 			skills = append(skills, skill.SummonDireWolf)
 		}
 	}
-	if _, found := s.Data.KeyBindings.KeyBindingForSkill(skill.SummonGrizzly); found && needsBear {
+
+	// Add grizzly bear if missing
+	if _, found := s.Data.KeyBindings.KeyBindingForSkill(skill.SummonGrizzly); found && needs.bear {
 		skills = append(skills, skill.SummonGrizzly)
 	}
-	if _, found := s.Data.KeyBindings.KeyBindingForSkill(skill.OakSage); found && needsOak {
+
+	// Add oak sage if missing
+	if _, found := s.Data.KeyBindings.KeyBindingForSkill(skill.OakSage); found && needs.oak {
 		skills = append(skills, skill.OakSage)
 	}
-	if _, found := s.Data.KeyBindings.KeyBindingForSkill(skill.SolarCreeper); found && needsCreeper {
-		skills = append(skills, skill.SolarCreeper)
-	}
-	if _, found := s.Data.KeyBindings.KeyBindingForSkill(skill.CarrionVine); found && needsCreeper {
-		skills = append(skills, skill.CarrionVine)
-	}
-	if _, found := s.Data.KeyBindings.KeyBindingForSkill(skill.PoisonCreeper); found && needsCreeper {
-		skills = append(skills, skill.PoisonCreeper)
+
+	// Add creepers if missing (only one type needed)
+	if needs.creeper {
+		if _, found := s.Data.KeyBindings.KeyBindingForSkill(skill.SolarCreeper); found {
+			skills = append(skills, skill.SolarCreeper)
+		} else if _, found := s.Data.KeyBindings.KeyBindingForSkill(skill.CarrionVine); found {
+			skills = append(skills, skill.CarrionVine)
+		} else if _, found := s.Data.KeyBindings.KeyBindingForSkill(skill.PoisonCreeper); found {
+			skills = append(skills, skill.PoisonCreeper)
+		}
 	}
 
 	return skills
@@ -255,26 +285,43 @@ func (s WindDruid) KillDuriel() error {
 	return s.killMonster(npc.Duriel, data.MonsterTypeUnique)
 }
 
-// Targets multiple council members, sorted by distance
+// Targets multiple council members
 func (s WindDruid) KillCouncil() error {
-	return s.KillMonsterSequence(func(d game.Data) (data.UnitID, bool) {
-		var councilMembers []data.Monster
-		for _, m := range d.Monsters {
-			if m.Name == npc.CouncilMember || m.Name == npc.CouncilMember2 || m.Name == npc.CouncilMember3 {
-				councilMembers = append(councilMembers, m)
+	context.Get().DisableItemPickup()
+	defer context.Get().EnableItemPickup()
+
+	for {
+		if !s.anyCouncilMemberAlive() {
+			break
+		}
+
+		err := s.KillMonsterSequence(func(d game.Data) (data.UnitID, bool) {
+			// Find next alive council member
+			for _, m := range d.Monsters.Enemies() {
+				if (m.Name == npc.CouncilMember || m.Name == npc.CouncilMember2 || m.Name == npc.CouncilMember3) &&
+					m.Stats[stat.Life] > 0 {
+					return m.UnitID, true
+				}
 			}
+			return 0, false
+		}, nil)
+
+		if err != nil {
+			return err
 		}
+	}
+	return nil
+}
 
-		sort.Slice(councilMembers, func(i, j int) bool {
-			return s.PathFinder.DistanceFromMe(councilMembers[i].Position) < s.PathFinder.DistanceFromMe(councilMembers[j].Position)
-		})
-
-		for _, m := range councilMembers {
-			return m.UnitID, true
+// Check if any council members are still alive
+func (s WindDruid) anyCouncilMemberAlive() bool {
+	for _, m := range s.Data.Monsters.Enemies() {
+		if (m.Name == npc.CouncilMember || m.Name == npc.CouncilMember2 || m.Name == npc.CouncilMember3) &&
+			m.Stats[stat.Life] > 0 {
+			return true
 		}
-
-		return 0, false
-	}, nil)
+	}
+	return false
 }
 
 func (s WindDruid) KillMephisto() error {
