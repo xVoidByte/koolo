@@ -62,16 +62,31 @@ goto :eof
 call :validate_environment
 if !errorlevel! neq 0 exit /b !errorlevel!
 
-:: Build Koolo binary
+:: Build Koolo binary with Garble
 call :print_header "Building Koolo Binary"
-call :print_step "Compiling Koolo"
+call :print_step "Compiling Koolo with Garble"
 if "%1"=="" (set VERSION=dev) else (set VERSION=%1)
-go build -trimpath -tags static --ldflags -extldflags="-static" -ldflags="-s -w -H windowsgui -X 'github.com/hectorgimenez/koolo/internal/config.Version=%VERSION%'" -o build/koolo.exe ./cmd/koolo
+
+:: Generate unique build identifiers
+for /f "delims=" %%a in ('powershell -Command "[guid]::NewGuid().ToString()"') do set "BUILD_ID=%%a"
+for /f "delims=" %%b in ('powershell -Command "Get-Date -Format 'o'"') do set "BUILD_TIME=%%b"
+
+:: Build with random seed and verification
+garble -literals -tiny -seed=random build -a -trimpath -tags static --ldflags "-s -w -H windowsgui -X 'main.buildID=%BUILD_ID%' -X 'main.buildTime=%BUILD_TIME%' -X 'github.com/hectorgimenez/koolo/internal/config.Version=%VERSION%'" -o "build\koolo-%BUILD_ID%.exe" ./cmd/koolo
+
+:: Verify output
+if exist "build\koolo-%BUILD_ID%.exe" (
+    echo Build successful: build\koolo-%BUILD_ID%.exe
+) else (
+    echo ERROR: Build failed
+    exit /b 1
+)
+
 if !errorlevel! neq 0 (
     call :print_error "Failed to build Koolo binary"
     exit /b 1
 )
-call :print_success "Successfully built koolo.exe"
+call :print_success "Successfully built obfuscated koolo.exe"
 
 :: Handle tools folder first
 call :print_header "Handling Tools"
