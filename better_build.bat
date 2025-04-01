@@ -64,29 +64,29 @@ if !errorlevel! neq 0 exit /b !errorlevel!
 
 :: Build Koolo binary with Garble
 call :print_header "Building Koolo Binary"
-call :print_step "Compiling Koolo with Garble"
 if "%1"=="" (set VERSION=dev) else (set VERSION=%1)
 
 :: Generate unique build identifiers
 for /f "delims=" %%a in ('powershell -Command "[guid]::NewGuid().ToString()"') do set "BUILD_ID=%%a"
 for /f "delims=" %%b in ('powershell -Command "Get-Date -Format 'o'"') do set "BUILD_TIME=%%b"
 
-:: Build with random seed and verification
-garble -literals -tiny -seed=random build -a -trimpath -tags static --ldflags "-s -w -H windowsgui -X 'main.buildID=%BUILD_ID%' -X 'main.buildTime=%BUILD_TIME%' -X 'github.com/hectorgimenez/koolo/internal/config.Version=%VERSION%'" -o "build\koolo-%BUILD_ID%.exe" ./cmd/koolo
+:: Build an obfuscated Koolo  binary
+call :print_step "Compiling Obfuscated Koolo executable"
+(
+    garble -literals -tiny -seed=random build -a -trimpath -tags static --ldflags "-s -w -H windowsgui -X 'main.buildID=%BUILD_ID%' -X 'main.buildTime=%BUILD_TIME%' -X 'github.com/hectorgimenez/koolo/internal/config.Version=%VERSION%'" -o "build\%BUILD_ID%.exe" ./cmd/koolo 2>&1
+) > garble.log
 
-:: Verify output
-if exist "build\koolo-%BUILD_ID%.exe" (
-    echo Build successful: build\koolo-%BUILD_ID%.exe
-) else (
-    echo ERROR: Build failed
-    exit /b 1
+:: Capture and style seed information
+for /f "tokens=4" %%s in ('findstr /C:"-seed chosen at random:" garble.log') do (
+    call :print_step "Obfuscation seed: !BUILD_ID!"
 )
+del garble.log
 
 if !errorlevel! neq 0 (
     call :print_error "Failed to build Koolo binary"
     exit /b 1
 )
-call :print_success "Successfully built obfuscated koolo.exe"
+call :print_success "Successfully built obfuscated executable"
 
 :: Handle tools folder first
 call :print_header "Handling Tools"
