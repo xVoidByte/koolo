@@ -78,10 +78,11 @@ There are some considerations to take into account:
 Setting the development environment is pretty straightforward, but the following dependencies are **required** to build the project.
 
 ### Dependencies
-- [Download Go >= 1.23](https://go.dev/dl/)
+- [Download Go >= 1.24.1](https://go.dev/dl/)
 - [Install git](https://gitforwindows.org/)
 
 ### Building from source
+
 Open the terminal and run the following commands in project root directory:
 ```shell
 git clone https://github.com/hectorgimenez/koolo.git
@@ -89,6 +90,11 @@ cd koolo
 build.bat
 ```
 This will produce the "build" directory with the executable file and all the required assets.
+
+Next, we install [Garble](https://github.com/burrowers/garble) using the following command:
+```shell
+go install mvdan.cc/garble@latest
+```
 
 ### Updating with latest changes
 In order to fetch latest `main` branch changes run the following commands in project root directory:
