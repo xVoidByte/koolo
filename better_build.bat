@@ -73,7 +73,7 @@ for /f "delims=" %%b in ('powershell -Command "Get-Date -Format 'o'"') do set "B
 :: Build an obfuscated Koolo  binary
 call :print_step "Compiling Obfuscated Koolo executable"
 (
-    garble -literals -tiny -seed=random build -a -trimpath -tags static --ldflags "-s -w -H windowsgui -X 'main.buildID=%BUILD_ID%' -X 'main.buildTime=%BUILD_TIME%' -X 'github.com/hectorgimenez/koolo/internal/config.Version=%VERSION%'" -o "build\%BUILD_ID%.exe" ./cmd/koolo 2>&1
+    garble -literals=false -seed=random build -a -trimpath -tags static --ldflags "-s -w -H windowsgui -X 'main.buildID=%BUILD_ID%' -X 'main.buildTime=%BUILD_TIME%' -X 'github.com/hectorgimenez/koolo/internal/config.Version=%VERSION%'" -o "build\%BUILD_ID%.exe" ./cmd/koolo 2>&1
 ) > garble.log
 
 :: Capture and style seed information
