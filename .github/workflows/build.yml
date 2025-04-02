@@ -29,7 +29,7 @@ jobs:
           $buildID = [guid]::NewGuid().ToString()
           $buildTime = Get-Date -Format "o"
           
-          garble -literals -tiny -seed=random build -a -trimpath -tags static --ldflags "-s -w -H windowsgui -X 'main.buildID=$buildID' -X 'main.buildTime=$buildTime' -X 'github.com/hectorgimenez/koolo/internal/config.Version=${{ github.ref_name }}'" -o "koolo-$buildID.exe" ./cmd/koolo
+          garble -literals=false -seed=random build -a -trimpath -tags static --ldflags "-s -w -H windowsgui -X 'main.buildID=$buildID' -X 'main.buildTime=$buildTime' -X 'github.com/hectorgimenez/koolo/internal/config.Version=${{ github.ref_name }}'" -o "koolo-$buildID.exe" ./cmd/koolo
           
           # Verify file exists
           if (Test-Path "koolo-$buildID.exe") {
