@@ -83,18 +83,18 @@ Setting the development environment is pretty straightforward, but the following
 
 ### Building from source
 
-Open the terminal and run the following commands in project root directory:
+First, we open the terminal and install [Garble](https://github.com/burrowers/garble) using the following command:
+```shell
+go install mvdan.cc/garble@latest
+```
+
+Next, run the following commands in project root directory:
 ```shell
 git clone https://github.com/hectorgimenez/koolo.git
 cd koolo
 build.bat
 ```
 This will produce the "build" directory with the executable file and all the required assets.
-
-Next, we install [Garble](https://github.com/burrowers/garble) using the following command:
-```shell
-go install mvdan.cc/garble@latest
-```
 
 ### Updating with latest changes
 In order to fetch latest `main` branch changes run the following commands in project root directory:
