@@ -2,6 +2,9 @@ package run
 
 import (
 	"time"
+	"errors" // NEW: Import errors package
+	"fmt"    // NEW: Import fmt for error formatting
+
 
 	"github.com/hectorgimenez/d2go/pkg/data"
 	"github.com/hectorgimenez/d2go/pkg/data/area"
@@ -10,6 +13,7 @@ import (
 	"github.com/hectorgimenez/d2go/pkg/data/object"
 	"github.com/hectorgimenez/d2go/pkg/data/quest"
 	"github.com/hectorgimenez/koolo/internal/action"
+	"github.com/hectorgimenez/koolo/internal/action/step"
 	"github.com/hectorgimenez/koolo/internal/config"
 	"github.com/hectorgimenez/koolo/internal/context"
 	"github.com/hectorgimenez/koolo/internal/game"
@@ -17,6 +21,8 @@ import (
 	"github.com/hectorgimenez/koolo/internal/utils"
 	"github.com/lxn/win"
 )
+
+
 
 type Quests struct {
 	ctx *context.Status
@@ -91,7 +97,16 @@ func (a Quests) clearDenQuest() error {
 		return err
 	}
 
+							a.ctx.CharacterCfg.Character.ClearPathDist = 20
+	if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
+		a.ctx.Logger.Error("Failed to save character configuration: %s", err.Error())}
+
+
 	action.ClearCurrentLevel(false, data.MonsterAnyFilter())
+
+		_, isLevelingChar := a.ctx.Char.(context.LevelingCharacter)
+	if !isLevelingChar {
+	
 
 	err = action.ReturnTown()
 	if err != nil {
@@ -103,7 +118,9 @@ func (a Quests) clearDenQuest() error {
 		return err
 	}
 
-	a.ctx.HID.PressKey(win.VK_ESCAPE)
+	step.CloseAllMenus()
+	
+	}
 
 	return nil
 }
@@ -111,9 +128,15 @@ func (a Quests) clearDenQuest() error {
 func (a Quests) rescueCainQuest() error {
 	a.ctx.Logger.Info("Starting Rescue Cain Quest...")
 
+	// --- Navigation to the Dark Wood and a safe zone near the Inifuss Tree ---
 	err := action.WayPoint(area.RogueEncampment)
 	if err != nil {
 		return err
+	}
+
+	a.ctx.CharacterCfg.Character.ClearPathDist = 20
+	if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
+		a.ctx.Logger.Error("Failed to save character configuration: %s", err.Error())
 	}
 
 	err = action.WayPoint(area.DarkWood)
@@ -121,40 +144,155 @@ func (a Quests) rescueCainQuest() error {
 		return err
 	}
 
-	err = action.MoveTo(func() (data.Position, bool) {
-		for _, o := range a.ctx.Data.Objects {
-			if o.Name == object.InifussTree {
-				return o.Position, true
-			}
+	
+	a.ctx.CharacterCfg.Character.ClearPathDist = 30
+	if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
+		a.ctx.Logger.Error("Failed to save character configuration: %s", err.Error())
+	}
+	
+
+
+	// Find the Inifuss Tree position.
+	var inifussTreePos data.Position
+	var foundTree bool
+	for _, o := range a.ctx.Data.Objects {
+		if o.Name == object.InifussTree {
+			inifussTreePos = o.Position
+			foundTree = true
+			break
 		}
-		return data.Position{}, false
-	})
+	}
+	if !foundTree {
+		a.ctx.Logger.Error("InifussTree not found, aborting quest.")
+		return errors.New("InifussTree not found")
+	}
+
+	// Get the player's current position.
+	playerPos := a.ctx.Data.PlayerUnit.Position
+
+	// --- New segmented approach to clear the path to the Inifuss Tree ---
+	// Start 55 units away and move closer in 10-unit increments.
+
+	
+	clearRadius := 20
+	for distance := 55; distance > 0; distance -= 5 {
+		a.ctx.Logger.Info(fmt.Sprintf("Moving to position %d units away from the Inifuss Tree to clear the area.", distance))
+		
+		// Calculate the new position based on the current distance.
+		safePos := atDistance(inifussTreePos, playerPos, distance)
+
+		// Move to the calculated position.
+		err = action.MoveToCoords(safePos)
+		if err != nil {
+			return err
+		}
+
+		// Clear a large area around the new position.
+		a.ctx.Logger.Info(fmt.Sprintf("Clearing a %d unit radius around the current position...", clearRadius))
+		action.ClearAreaAroundPlayer(clearRadius, data.MonsterAnyFilter())
+	}
+	
+	// --- End of new segmented approach ---
+	
+
+
+	err = action.MoveToCoords(inifussTreePos)
 	if err != nil {
 		return err
 	}
 
-	action.ClearAreaAroundPlayer(30, data.MonsterAnyFilter())
-
 	obj, found := a.ctx.Data.Objects.FindOne(object.InifussTree)
 	if !found {
-		a.ctx.Logger.Debug("InifussTree not found")
+		a.ctx.Logger.Error("InifussTree not found, aborting quest.")
+		return errors.New("InifussTree not found")
 	}
 
 	err = action.InteractObject(obj, func() bool {
 		updatedObj, found := a.ctx.Data.Objects.FindOne(object.InifussTree)
-		if found {
-			if !updatedObj.Selectable {
-				a.ctx.Logger.Debug("Interacted with InifussTree")
-			}
-			return !updatedObj.Selectable
-		}
-		return false
+		return found && !updatedObj.Selectable
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("error interacting with Inifuss Tree: %w", err)
 	}
 
-	action.ItemPickup(0)
+	scrollInifussUnitID := data.UnitID(524)
+	scrollInifussName := "Scroll of Inifuss"
+
+PickupLoop:
+	for i := 0; i < 5; i++ {
+		a.ctx.RefreshGameData()
+
+		_, foundInInv := a.ctx.Data.Inventory.FindByID(scrollInifussUnitID)
+		if foundInInv {
+			a.ctx.Logger.Info(fmt.Sprintf("%s found in inventory. Proceeding with quest.", scrollInifussName))
+			break PickupLoop
+		}
+
+		// Find the scroll on the ground.
+		var scrollObj data.Item
+		foundOnGround := false
+		for _, itm := range a.ctx.Data.Inventory.ByLocation(item.LocationGround) {
+			if itm.UnitID == scrollInifussUnitID {
+				scrollObj = itm
+				foundOnGround = true
+				break
+			}
+		}
+
+		if foundOnGround {
+			a.ctx.Logger.Info(fmt.Sprintf("%s found on the ground at position %v. Attempting pickup (Attempt %d)...", scrollInifussName, scrollObj.Position, i+1))
+
+			playerPos := a.ctx.Data.PlayerUnit.Position
+			safeAwayPos := atDistance(scrollObj.Position, playerPos, -5)
+
+			pickupAttempts := 0
+			for pickupAttempts < 8 {
+				a.ctx.Logger.Debug("Moving away from scroll for a brief moment...")
+				moveAwayErr := action.MoveToCoords(safeAwayPos)
+				if moveAwayErr != nil {
+					a.ctx.Logger.Warn(fmt.Sprintf("Failed to move away from scroll: %v", moveAwayErr))
+				}
+				utils.Sleep(200)
+
+				moveErr := action.MoveToCoords(scrollObj.Position)
+				if moveErr != nil {
+					a.ctx.Logger.Error(fmt.Sprintf("Failed to move to scroll position: %v", moveErr))
+					utils.Sleep(500)
+					pickupAttempts++
+					continue
+				}
+
+				// --- Refresh game data just before pickup attempt ---
+				a.ctx.RefreshGameData()
+
+				pickupErr := action.ItemPickup(10)
+				if pickupErr != nil {
+					a.ctx.Logger.Warn(fmt.Sprintf("Pickup attempt %d failed: %v", pickupAttempts+1, pickupErr))
+					utils.Sleep(500)
+					pickupAttempts++
+					continue
+				}
+
+				a.ctx.RefreshGameData()
+				_, foundInInvAfterPickup := a.ctx.Data.Inventory.FindByID(scrollInifussUnitID)
+				if foundInInvAfterPickup {
+					a.ctx.Logger.Info(fmt.Sprintf("Pickup confirmed for %s after %d attempts. Proceeding.", scrollInifussName, pickupAttempts+1))
+					break PickupLoop
+				}
+				pickupAttempts++
+			}
+		} else {
+			a.ctx.Logger.Debug(fmt.Sprintf("%s not found on the ground on attempt %d. Retrying.", scrollInifussName, i+1))
+			utils.Sleep(1000)
+		}
+	}
+
+	_, foundInInv := a.ctx.Data.Inventory.FindByID(scrollInifussUnitID)
+	if !foundInInv {
+		a.ctx.Logger.Error(fmt.Sprintf("Failed to pick up %s after all attempts. Aborting current run.", scrollInifussName))
+		return errors.New("failed to pick up Scroll of Inifuss")
+	}
+
 	err = action.ReturnTown()
 	if err != nil {
 		return err
@@ -165,10 +303,9 @@ func (a Quests) rescueCainQuest() error {
 		return err
 	}
 
-	a.ctx.HID.PressKey(win.VK_ESCAPE)
+	step.CloseAllMenus()
 
-	//Reuse Tristram Run actions
-	err = Tristram{}.Run()
+	err = NewTristram().Run()
 	if err != nil {
 		return err
 	}
@@ -177,6 +314,7 @@ func (a Quests) rescueCainQuest() error {
 
 	return nil
 }
+
 
 func (a Quests) retrieveHammerQuest() error {
 	a.ctx.Logger.Info("Starting Retrieve Hammer Quest...")
@@ -233,12 +371,28 @@ func (a Quests) retrieveHammerQuest() error {
 		return err
 	}
 
-	a.ctx.HID.PressKey(win.VK_ESCAPE)
+	step.CloseAllMenus()
 
 	return nil
 }
 
 func (a Quests) killRadamentQuest() error {
+	
+	if itm, found := a.ctx.Data.Inventory.Find("BookofSkill"); found {
+        a.ctx.Logger.Info("BookofSkill found in inventory. Using it...")
+        
+        // Use the book of skill
+        step.CloseAllMenus()
+        a.ctx.HID.PressKeyBinding(a.ctx.Data.KeyBindings.Inventory)
+        screenPos := ui.GetScreenCoordsForItem(itm)
+        utils.Sleep(200)
+        a.ctx.HID.Click(game.RightButton, screenPos.X, screenPos.Y)
+        step.CloseAllMenus()
+        
+        a.ctx.Logger.Info("Book of Skill used successfully.")
+        
+    }
+	
 	var startingPositionAtma = data.Position{
 		X: 5138,
 		Y: 5057,
@@ -278,6 +432,10 @@ func (a Quests) killRadamentQuest() error {
 	}
 
 	action.ClearAreaAroundPlayer(30, data.MonsterAnyFilter())
+	
+	
+	
+	if !a.ctx.Data.Quests[quest.Act2RadamentsLair].Completed(){
 
 	// Sometimes it moves too far away from the book to pick it up, making sure it moves back to the chest
 	err = action.MoveTo(func() (data.Position, bool) {
@@ -311,14 +469,16 @@ func (a Quests) killRadamentQuest() error {
 		return err
 	}
 
-	a.ctx.HID.PressKey(win.VK_ESCAPE)
+	step.CloseAllMenus()
 	a.ctx.HID.PressKeyBinding(a.ctx.Data.KeyBindings.Inventory)
 	itm, _ := a.ctx.Data.Inventory.Find("BookofSkill")
 	screenPos := ui.GetScreenCoordsForItem(itm)
 	utils.Sleep(200)
 	a.ctx.HID.Click(game.RightButton, screenPos.X, screenPos.Y)
-	a.ctx.HID.PressKey(win.VK_ESCAPE)
-
+	step.CloseAllMenus()
+	
+	}
+	
 	return nil
 }
 
@@ -444,7 +604,7 @@ func (a Quests) retrieveBookQuest() error {
 		return err
 	}
 
-	a.ctx.HID.PressKey(win.VK_ESCAPE)
+	step.CloseAllMenus()
 
 	return nil
 }
@@ -452,7 +612,7 @@ func (a Quests) retrieveBookQuest() error {
 func (a Quests) killIzualQuest() error {
 	a.ctx.Logger.Info("Starting Kill Izual Quest...")
 
-	err := action.MoveToArea(area.OuterSteppes)
+   err := action.MoveToArea(area.OuterSteppes)
 	if err != nil {
 		return err
 	}
@@ -462,6 +622,7 @@ func (a Quests) killIzualQuest() error {
 	if err != nil {
 		return err
 	}
+
 	action.Buff()
 
 	err = action.MoveTo(func() (data.Position, bool) {
@@ -490,7 +651,11 @@ func (a Quests) killIzualQuest() error {
 	if err != nil {
 		return err
 	}
-
+	
+	time.Sleep(500)
+	action.UpdateQuestLog()
+	time.Sleep(500)
+	
 	return nil
 }
 
@@ -536,7 +701,7 @@ func (a Quests) killShenkQuest() error {
 		return err
 	}
 
-	a.ctx.HID.PressKey(win.VK_ESCAPE)
+	step.CloseAllMenus()
 
 	return nil
 }
@@ -572,7 +737,7 @@ func (a Quests) rescueAnyaQuest() error {
 		return err
 	}
 
-	action.ClearAreaAroundPlayer(15, data.MonsterAnyFilter())
+	//action.ClearAreaAroundPlayer(15, data.MonsterAnyFilter())
 
 	anya, found := a.ctx.Data.Objects.FindOne(object.FrozenAnya)
 	if !found {
@@ -622,13 +787,13 @@ func (a Quests) rescueAnyaQuest() error {
 		return err
 	}
 
-	a.ctx.HID.PressKey(win.VK_ESCAPE)
+	step.CloseAllMenus()
 	a.ctx.HID.PressKeyBinding(a.ctx.Data.KeyBindings.Inventory)
 	itm, _ := a.ctx.Data.Inventory.Find("ScrollOfResistance")
 	screenPos := ui.GetScreenCoordsForItem(itm)
 	utils.Sleep(200)
 	a.ctx.HID.Click(game.RightButton, screenPos.X, screenPos.Y)
-	a.ctx.HID.PressKey(win.VK_ESCAPE)
+	step.CloseAllMenus()
 
 	return nil
 }
@@ -638,6 +803,16 @@ func (a Quests) killAncientsQuest() error {
 		X: 10049,
 		Y: 12623,
 	}
+
+	// Store the original configuration
+	originalBackToTownCfg := a.ctx.CharacterCfg.BackToTown
+	
+	// Defer the restoration of the configuration.
+	// This will run when the function exits, regardless of how.
+	defer func() {
+		a.ctx.CharacterCfg.BackToTown = originalBackToTownCfg
+		a.ctx.Logger.Info("Restored original back-to-town checks after Ancients fight.")
+	}()
 
 	err := action.WayPoint(area.Harrogath)
 	if err != nil {
@@ -669,10 +844,27 @@ func (a Quests) killAncientsQuest() error {
 	utils.Sleep(1000)
 	a.ctx.HID.PressKey(win.VK_RETURN)
 	utils.Sleep(2000)
+	
+	// Modify the configuration for the Ancients fight
+	a.ctx.CharacterCfg.BackToTown.NoHpPotions = false
+	a.ctx.CharacterCfg.BackToTown.NoMpPotions = false
+	a.ctx.CharacterCfg.BackToTown.EquipmentBroken = false
+	a.ctx.CharacterCfg.BackToTown.MercDied = false
 
 	action.ClearAreaAroundPlayer(50, data.MonsterEliteFilter())
+	
+	// The defer statement above will handle the restoration
+	// a.ctx.CharacterCfg.BackToTown = originalBackToTownCfg // This line is now removed
+	// a.ctx.Logger.Info("Restored original back-to-town checks after Ancients fight.") // This line is now part of the defer
+	
+	utils.Sleep(500)
+	action.UpdateQuestLog()
+	utils.Sleep(500)
+	action.UpdateQuestLog()
+	utils.Sleep(500)
+	step.CloseAllMenus()
 
 	action.ReturnTown()
-
+	
 	return nil
 }

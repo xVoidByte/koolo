@@ -10,6 +10,19 @@
 {{ define "andariel" }}
     <fieldset>
         <label><input type="checkbox" name="gameAndarielClearRoom" {{ if .Config.Game.Andariel.ClearRoom }}checked{{ end }}> Clear room first</label>
+        <label><input type="checkbox" name="gameAndarielUseAntidoes" {{ if .Config.Game.Andariel.UseAntidoes }}checked{{ end }}> Use antidoes</label>
+    </fieldset>
+{{ end }}
+
+{{ define "duriel" }}
+    <fieldset>
+        <label><input type="checkbox" name="gameDurielUseThawing" {{ if .Config.Game.Duriel.UseThawing }}checked{{ end }}> Use thawing potions</label>
+    </fieldset>
+{{ end }}
+
+{{ define "countess" }}
+    <fieldset>
+        <label><input type="checkbox" name="gameCountessClearFloors" {{ if .Config.Game.Countess.ClearFloors }}checked{{ end }}> Clear all floors of Forgotten Tower </label>
     </fieldset>
 {{ end }}
 
@@ -138,6 +151,19 @@
     <fieldset>
         <label><input type="checkbox" name="gameLevelingEnsurePointsAllocation" {{ if .Config.Game.Leveling.EnsurePointsAllocation }}checked{{ end }}> Automatically allocate stats/skills</label>
         <label><input type="checkbox" name="gameLevelingEnsureKeyBinding" {{ if .Config.Game.Leveling.EnsureKeyBinding }}checked{{ end }}> Automatically bind skills</label>
+        <label><input type="checkbox" name="gameLevelingAutoEquip" {{ if .Config.Game.Leveling.AutoEquip }}checked{{ end }}> Automatically equip better items</label>
+		        <h6>Create Runewords</h6>
+            <div style="margin-left: 20px;">
+                <input type="text" id="search-runewords" placeholder="Search runewords..." style="margin-bottom: 10px; width: 100%; max-width: 300px;">
+                <div class="recipe-grid" id="runeword-recipe-grid">
+                    {{ range $index, $recipe := .RunewordRecipeList }}
+                        <label class="runeword-item" style="display: none;"> <!-- Initially hidden -->
+                            <input type="checkbox" name="gameLevelingEnabledRunewordRecipes" value="{{ $recipe }}" {{ if contains $.Config.Game.Leveling.EnabledRunewordRecipes $recipe }}checked{{ end }}>
+                            <span class="runeword-name">{{ $recipe }}</span>
+                        </label>
+                    {{ end }}
+                </div>
+            </div>
     </fieldset>
 {{ end }}
 

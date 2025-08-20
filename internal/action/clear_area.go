@@ -15,19 +15,25 @@ func ClearAreaAroundPlayer(radius int, filter data.MonsterFilter) error {
 }
 
 func ClearAreaAroundPosition(pos data.Position, radius int, filter data.MonsterFilter) error {
-	ctx := context.Get()
-	ctx.SetLastAction("ClearAreaAroundPosition")
+    ctx := context.Get()
+    ctx.SetLastAction("ClearAreaAroundPosition")
 
-	return ctx.Char.KillMonsterSequence(func(d game.Data) (data.UnitID, bool) {
-		for _, m := range d.Monsters.Enemies(filter) {
-			distanceToTarget := pather.DistanceFromPoint(pos, m.Position)
-			if ctx.Data.AreaData.IsWalkable(m.Position) && distanceToTarget <= radius {
-				return m.UnitID, true
-			}
-		}
+    // Disable item pickup at the beginning of the function
+    ctx.DisableItemPickup()
+    
+    // Defer the re-enabling of item pickup to ensure it happens regardless of how the function exits
+    defer ctx.EnableItemPickup()
 
-		return 0, false
-	}, nil)
+    return ctx.Char.KillMonsterSequence(func(d game.Data) (data.UnitID, bool) {
+        for _, m := range d.Monsters.Enemies(filter) {
+            distanceToTarget := pather.DistanceFromPoint(pos, m.Position)
+            if ctx.Data.AreaData.IsWalkable(m.Position) && distanceToTarget <= radius {
+                return m.UnitID, true
+            }
+        }
+
+        return 0, false
+    }, nil)
 }
 
 func ClearThroughPath(pos data.Position, radius int, filter data.MonsterFilter) error {

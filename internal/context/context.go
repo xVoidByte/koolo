@@ -53,6 +53,8 @@ type Context struct {
 	LastBuffAt        time.Time
 	ContextDebug      map[Priority]*Debug
 	CurrentGame       *CurrentGameHelper
+	SkillPointIndex int // NEW FIELD: Tracks the next skill to consider from the character's SkillPoints() list
+	ForceAttack       bool
 }
 
 type Debug struct {
@@ -61,13 +63,15 @@ type Debug struct {
 }
 
 type CurrentGameHelper struct {
-	BlacklistedItems []data.Item
-	PickedUpItems    map[int]int
-	AreaCorrection   struct {
+	BlacklistedItems         []data.Item
+	PickedUpItems            map[int]int
+	AreaCorrection           struct {
 		Enabled      bool
 		ExpectedArea area.ID
 	}
 	PickupItems bool
+	FailedToCreateGameAttempts int
+	FailedMenuAttempts int
 }
 
 func NewContext(name string) *Status {
@@ -83,6 +87,8 @@ func NewContext(name string) *Status {
 			PriorityStop:       {},
 		},
 		CurrentGame: NewGameHelper(),
+		SkillPointIndex: 0,
+		ForceAttack: false,
 	}
 	botContexts[getGoroutineID()] = &Status{Priority: PriorityNormal, Context: ctx}
 
@@ -91,9 +97,10 @@ func NewContext(name string) *Status {
 
 func NewGameHelper() *CurrentGameHelper {
 	return &CurrentGameHelper{
-		PickupItems:      true,
-		PickedUpItems:    make(map[int]int),
-		BlacklistedItems: []data.Item{},
+		PickupItems:                true,
+		PickedUpItems:              make(map[int]int),
+		BlacklistedItems:           []data.Item{},
+		FailedToCreateGameAttempts: 0, 
 	}
 }
 
@@ -183,4 +190,7 @@ func (ctx *Context) Cleanup() {
 		ctx.Logger.Debug("Resetting picked up items map due to exceeding 200 items")
 		ctx.CurrentGame.PickedUpItems = make(map[int]int)
 	}
+	// Reset counters on cleanup for a new session
+	ctx.CurrentGame.FailedToCreateGameAttempts = 0
+	ctx.CurrentGame.FailedMenuAttempts = 0 // Also reset this on cleanup
 }

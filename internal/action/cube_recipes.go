@@ -420,7 +420,7 @@ func CubeRecipes() error {
 							continue
 						}
 
-						shouldStash, reason, _ := shouldStashIt(item, false)
+						shouldStash, _, reason, _ := shouldStashIt(item, false)
 
 						if shouldStash {
 							ctx.Logger.Debug("Stashing item after cube recipe.", "item", item.Name, "recipe", recipe.Name, "reason", reason)

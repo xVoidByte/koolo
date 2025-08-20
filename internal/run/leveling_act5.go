@@ -1,7 +1,13 @@
 package run
 
 import (
-	"time"
+	"fmt"
+
+		"github.com/hectorgimenez/koolo/internal/action/step"
+
+		"github.com/hectorgimenez/koolo/internal/game"
+		"github.com/hectorgimenez/koolo/internal/utils"
+		"github.com/hectorgimenez/koolo/internal/ui"
 
 	"github.com/hectorgimenez/d2go/pkg/data"
 	"github.com/hectorgimenez/d2go/pkg/data/area"
@@ -11,216 +17,200 @@ import (
 	"github.com/hectorgimenez/d2go/pkg/data/quest"
 	"github.com/hectorgimenez/d2go/pkg/data/stat"
 	"github.com/hectorgimenez/koolo/internal/action"
-	"github.com/hectorgimenez/koolo/internal/context"
-	"github.com/hectorgimenez/koolo/internal/game"
-	"github.com/hectorgimenez/koolo/internal/ui"
-	"github.com/hectorgimenez/koolo/internal/utils"
-	"github.com/lxn/win"
+	"github.com/hectorgimenez/koolo/internal/config" // Make sure this import is present
+	//	"github.com/lxn/win" 
+	
 )
+
+
 
 func (a Leveling) act5() error {
 	if a.ctx.Data.PlayerUnit.Area != area.Harrogath {
 		return nil
 	}
+	
+	
 
-	if a.ctx.Data.Quests[quest.Act5RiteOfPassage].Completed() {
-		a.ctx.Logger.Info("Starting Baal run...")
-		Baal{}.Run()
 
-		lvl, _ := a.ctx.Data.PlayerUnit.FindStat(stat.Level, 0)
-		if a.ctx.Data.PlayerUnit.Area == area.TheWorldstoneChamber && len(a.ctx.Data.Monsters.Enemies()) == 0 {
-			switch a.ctx.CharacterCfg.Game.Difficulty {
-			case difficulty.Normal:
-				if lvl.Value >= 46 {
-					a.ctx.CharacterCfg.Game.Difficulty = difficulty.Nightmare
-				}
-			case difficulty.Nightmare:
-				if lvl.Value >= 65 {
-					a.ctx.CharacterCfg.Game.Difficulty = difficulty.Hell
-				}
+action.VendorRefill(true, true);
+	
+// Gold Farming Logic (and immediate return if farming is needed)
+    if (a.ctx.CharacterCfg.Game.Difficulty == difficulty.Normal && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 30000) ||
+        (a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 50000) ||
+        (a.ctx.CharacterCfg.Game.Difficulty == difficulty.Hell && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 70000) {
+
+        a.ctx.Logger.Info("Low on gold. Initiating Frigid Highlands gold farm.")
+        if err := a.FrigidHighlands(); err != nil {
+            a.ctx.Logger.Error("Error during Bloody Foothills gold farm: %v", err)
+            return err // Propagate error if farming fails
+        }
+        a.ctx.Logger.Info("Gold farming completed. Quitting current run to re-evaluate in next game.")
+        return nil // Key: This immediately exits the 'act5' function, ending the current game run.
+    }
+    // If we reach this point, it means gold is sufficient, and we skip farming for this run.
+
+	lvl, _ := a.ctx.Data.PlayerUnit.FindStat(stat.Level, 0)
+
+	// Use a flag to indicate if difficulty was changed and needs saving
+	difficultyChanged := false
+
+	// Logic for Act5EveOfDestruction quest completion
+	if a.ctx.Data.Quests[quest.Act5EveOfDestruction].Completed() {
+		
+	a.ctx.Logger.Info("Eve of Destruction completed")	
+		
+		currentDifficulty := a.ctx.CharacterCfg.Game.Difficulty
+		switch currentDifficulty {
+		case difficulty.Normal:
+			if lvl.Value >= 45 {
+				a.ctx.CharacterCfg.Game.Difficulty = difficulty.Nightmare
+				difficultyChanged = true
+			}
+		case difficulty.Nightmare:
+			// Get current FireResist and LightningResist values using FindStat on PlayerUnit
+			rawFireRes, _ := a.ctx.Data.PlayerUnit.FindStat(stat.FireResist, 0)
+			rawLightRes, _ := a.ctx.Data.PlayerUnit.FindStat(stat.LightningResist, 0)
+
+			// Apply Nightmare difficulty penalty (-40) to resistances for effective values
+			effectiveFireRes := rawFireRes.Value - 40
+			effectiveLightRes := rawLightRes.Value - 40
+
+			// Log the effective resistance values
+			a.ctx.Logger.Info(fmt.Sprintf("Current effective resistances (Nightmare penalty applied) - Fire: %d, Lightning: %d", effectiveFireRes, effectiveLightRes))
+
+			// Check conditions using effective resistance values
+			if lvl.Value >= 70 && effectiveFireRes >= 75 && effectiveLightRes >= 50 {
+				a.ctx.CharacterCfg.Game.Difficulty = difficulty.Hell
+
+				difficultyChanged = true
 			}
 		}
-		return nil
 
+		if difficultyChanged {
+			a.ctx.Logger.Info("Difficulty changed to %s. Saving character configuration...", a.ctx.CharacterCfg.Game.Difficulty)
+			// Use the new ConfigFolderName field here!
+			if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
+				a.ctx.Logger.Error("Failed to save character configuration: %s", err.Error())
+				return fmt.Errorf("failed to save character configuration: %w", err)
+			}
+			return nil
+		}
+	}
+
+
+
+	if  (a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && lvl.Value < 60) {
+
+		diabloRun := NewDiablo()
+		err := diabloRun.Run()
+		if err != nil {
+			return err
+		}
+	}
+
+
+		
+
+	// Logic for Act5RiteOfPassage quest completion
+	if a.ctx.Data.Quests[quest.Act5RiteOfPassage].Completed() && a.ctx.Data.Quests[quest.Act5PrisonOfIce].Completed() {
+		a.ctx.Logger.Info("Starting Baal run...")
+		if a.ctx.CharacterCfg.Game.Difficulty != difficulty.Normal {
+			a.ctx.CharacterCfg.Game.Baal.SoulQuit = true
+		}
+		NewBaal(nil).Run()
+
+	
+		return nil
 	}
 
 	wp, _ := a.ctx.Data.Objects.FindOne(object.ExpansionWaypoint)
 	action.MoveToCoords(wp.Position)
 
 	if _, found := a.ctx.Data.Monsters.FindOne(npc.Drehya, data.MonsterTypeNone); !found {
-		a.anya()
+		NewQuests().rescueAnyaQuest()
+
+		action.MoveToCoords(data.Position{
+			X: 5107,
+			Y: 5119,
+		})
+		action.InteractNPC(npc.Drehya)
+
 	}
 
-	err := a.ancients()
-	if err != nil {
-		return err
+	if a.ctx.Data.Quests[quest.Act5PrisonOfIce].HasStatus(quest.StatusInProgress6) {
+
+		a.ctx.Logger.Info("StatusInProgress6")
+
+		action.MoveToCoords(data.Position{
+			X: 5107,
+			Y: 5119,
+		})
+		action.InteractNPC(npc.Drehya)
 	}
 
-	return nil
-}
+	if _, found := a.ctx.Data.Inventory.Find("ScrollOfResistance"); found {
+		a.ctx.Logger.Info("ScrollOfResistance found in inventory, attempting to use it.")
+		step.CloseAllMenus()
+		a.ctx.HID.PressKeyBinding(a.ctx.Data.KeyBindings.Inventory)
+		utils.Sleep(500) // Give time for inventory to open and data to refresh
 
-func (a Leveling) anya() error {
-	a.ctx.Logger.Info("Rescuing Anya...")
-
-	err := action.WayPoint(area.CrystallinePassage)
-	if err != nil {
-		return err
-	}
-	action.Buff()
-
-	err = action.MoveToArea(area.FrozenRiver)
-	if err != nil {
-		return err
-	}
-	action.Buff()
-
-	err = action.MoveTo(func() (data.Position, bool) {
-		anya, found := a.ctx.Data.NPCs.FindOne(793)
-		return anya.Positions[0], found
-	})
-	if err != nil {
-		return err
-	}
-
-	err = action.MoveTo(func() (data.Position, bool) {
-		anya, found := a.ctx.Data.Objects.FindOne(object.FrozenAnya)
-		return anya.Position, found
-	})
-	if err != nil {
-		return err
-	}
-
-	action.ClearAreaAroundPlayer(15, data.MonsterAnyFilter())
-
-	anya, found := a.ctx.Data.Objects.FindOne(object.FrozenAnya)
-	if !found {
-		a.ctx.Logger.Debug("Frozen Anya not found")
-	}
-
-	err = action.InteractObject(anya, nil)
-	if err != nil {
-		return err
-	}
-
-	err = action.ReturnTown()
-	if err != nil {
-		return err
-	}
-
-	action.IdentifyAll(false)
-	action.Stash(false)
-	action.ReviveMerc()
-	action.Repair()
-	action.VendorRefill(false, true)
-
-	err = action.InteractNPC(npc.Malah)
-	if err != nil {
-		return err
-	}
-
-	err = action.UsePortalInTown()
-	if err != nil {
-		return err
-	}
-
-	err = action.InteractObject(anya, nil)
-	if err != nil {
-		return err
-	}
-
-	err = action.ReturnTown()
-	if err != nil {
-		return err
-	}
-
-	time.Sleep(8000)
-
-	err = action.InteractNPC(npc.Malah)
-	if err != nil {
-		return err
-	}
-
-	a.ctx.HID.PressKey(win.VK_ESCAPE)
-	a.ctx.HID.PressKeyBinding(a.ctx.Data.KeyBindings.Inventory)
-	itm, _ := a.ctx.Data.Inventory.Find("ScrollOfResistance")
-	screenPos := ui.GetScreenCoordsForItem(itm)
-	utils.Sleep(200)
-	a.ctx.HID.Click(game.RightButton, screenPos.X, screenPos.Y)
-	a.ctx.HID.PressKey(win.VK_ESCAPE)
-
-	return nil
-}
-
-func (a Leveling) ancients() error {
-	char := a.ctx.Char.(context.LevelingCharacter)
-
-	a.ctx.Logger.Info("Kill the Ancients...")
-
-	err := action.WayPoint(area.TheAncientsWay)
-	if err != nil {
-		return err
-	}
-	action.Buff()
-
-	err = action.MoveToArea(area.ArreatSummit)
-	if err != nil {
-		return err
-	}
-	action.Buff()
-
-	action.ReturnTown()
-	action.InRunReturnTownRoutine()
-	action.UsePortalInTown()
-	action.Buff()
-
-	ancientsaltar, found := a.ctx.Data.Objects.FindOne(object.AncientsAltar)
-	if !found {
-		a.ctx.Logger.Debug("Ancients Altar not found")
-	}
-
-	err = action.InteractObject(ancientsaltar, func() bool {
-		if len(a.ctx.Data.Monsters.Enemies()) > 0 {
-			return true
+		// Re-find the item after opening inventory to ensure correct screen position
+		if itm, foundAgain := a.ctx.Data.Inventory.Find("ScrollOfResistance"); foundAgain {
+			screenPos := ui.GetScreenCoordsForItem(itm)
+			utils.Sleep(200)
+			a.ctx.HID.Click(game.RightButton, screenPos.X, screenPos.Y)
+			utils.Sleep(500) // Give time for the scroll to be used
+			a.ctx.Logger.Info("ScrollOfResistance used.")
+		} else {
+			a.ctx.Logger.Warn("ScrollOfResistance disappeared from inventory before it could be used.")
 		}
-		a.ctx.HID.Click(game.LeftButton, 300, 300)
-		utils.Sleep(1000)
-		return false
-	})
+		step.CloseAllMenus() // Close inventory after attempt
+	}
+
+
+/*	if lvl, _ := a.ctx.Data.PlayerUnit.FindStat(stat.Level, 0); lvl.Value < 35 && a.ctx.Data.CharacterCfg.Game.Difficulty == difficulty.Normal {
+		return NewPindleskin().Run()
+		
+		
+	}
+
+	if lvl, _ := a.ctx.Data.PlayerUnit.FindStat(stat.Level, 0); lvl.Value < 60 && a.ctx.Data.CharacterCfg.Game.Difficulty == difficulty.Nightmare {
+		return NewPindleskin().Run()
+	}
+
+	if lvl, _ := a.ctx.Data.PlayerUnit.FindStat(stat.Level, 0); lvl.Value < 80 && a.ctx.Data.CharacterCfg.Game.Difficulty == difficulty.Hell {
+		return NewPindleskin().Run()
+	}
+*/
+	err := NewQuests().killAncientsQuest()
 	if err != nil {
 		return err
 	}
-
-	err = char.KillAncients()
-	if err != nil {
-		return err
-	}
-
-	summitdoor, found := a.ctx.Data.Objects.FindOne(object.ArreatSummitDoorToWorldstone)
-	if !found {
-		a.ctx.Logger.Debug("Worldstone Door not found")
-	}
-
-	err = action.InteractObject(summitdoor, func() bool {
-		obj, _ := a.ctx.Data.Objects.FindOne(object.ArreatSummitDoorToWorldstone)
-		return !obj.Selectable
-	})
-	if err != nil {
-		return err
-	}
-
-	time.Sleep(5000)
-
-	err = action.MoveToArea(area.TheWorldStoneKeepLevel1)
-	if err != nil {
-		return err
-	}
-
-	err = action.MoveToArea(area.TheWorldStoneKeepLevel2)
-	if err != nil {
-		return err
-	}
-
-	action.DiscoverWaypoint()
 
 	return nil
 }
+
+
+
+
+func (a Leveling) FrigidHighlands() error {
+	a.ctx.Logger.Info("Entering BloodyFoothills for gold farming...")
+
+	err := action.WayPoint(area.FrigidHighlands)
+	if err != nil {
+		a.ctx.Logger.Error("Failed to move to Frigid Highlands area: %v", err)
+		return err 
+	}
+	a.ctx.Logger.Info("Successfully reached Frigid Highlands.")
+
+	err = action.ClearCurrentLevel(false, data.MonsterAnyFilter())
+	if err != nil {
+		a.ctx.Logger.Error("Failed to clear Frigid Highlands area: %v", err)
+		return err 
+	}
+	a.ctx.Logger.Info("Successfully cleared Frigid Highlands area.")
+
+	return nil 
+}
+
+

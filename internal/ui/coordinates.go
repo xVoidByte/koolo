@@ -64,16 +64,29 @@ const (
 	RepairButtonY        = 515
 	RepairButtonYClassic = 557
 
-	AnvilCenterX = 272
-	AnvilCenterY = 333
-	AnvilBtnX    = 272
-	AnvilBtnY    = 450
+	AnvilCenterX        = 272
+	AnvilCenterXClassic = 355
 
-	MainSkillButtonX = 596
-	MainSkillButtonY = 693
+	AnvilCenterY        = 333
+	AnvilCenterYClassic = 200
 
-	SecondarySkillButtonX = 686
-	SecondarySkillButtonY = 693
+	AnvilBtnX        = 272
+	AnvilBtnXClassic = 325
+
+	AnvilBtnY        = 450
+	AnvilBtnYClassic = 300
+
+	MainSkillButtonX        = 596
+	MainSkillButtonXClassic = 300
+
+	MainSkillButtonY        = 693
+	MainSkillButtonYClassic = 690
+
+	SecondarySkillButtonX        = 686
+	SecondarySkillButtonXClassic = 955
+
+	SecondarySkillButtonY        = 693
+	SecondarySkillButtonYClassic = 690
 
 	GambleRefreshButtonX        = 390
 	GambleRefreshButtonXClassic = 540
@@ -81,13 +94,23 @@ const (
 	GambleRefreshButtonY        = 515
 	GambleRefreshButtonYClassic = 553
 
-	SecondarySkillListFirstSkillX = 687
-	MainSkillListFirstSkillX      = 592
-	SkillListFirstSkillY          = 590
-	SkillListSkillOffset          = 45
+	SecondarySkillListFirstSkillX        = 687
+	SecondarySkillListFirstSkillXClassic = 996
 
-	FirstMercFromContractorListX = 175
-	FirstMercFromContractorListY = 142
+	MainSkillListFirstSkillX        = 592
+	MainSkillListFirstSkillXClassic = 285
+
+	SkillListFirstSkillY        = 590
+	SkillListFirstSkillYClassic = 595
+
+	SkillListSkillOffset        = 45
+	SkillListSkillOffsetClassic = 60
+
+	FirstMercFromContractorListX        = 175
+	FirstMercFromContractorListXClassic = 410
+
+	FirstMercFromContractorListY        = 142
+	FirstMercFromContractorListYClassic = 227
 
 	StashGoldBtnX        = 966
 	StashGoldBtnXClassic = 754
@@ -112,4 +135,88 @@ const (
 
 	CloseMiniPanelClassicX = 639
 	CloseMiniPanelClassicY = 686
+
+	EquipHeadClassicX = 833
+	EquipHeadClassicY = 110
+
+	EquipNeckClassicX = 905
+	EquipNeckClassicY = 130
+
+	EquipLArmClassicX = 700
+	EquipLArmClassicY = 190
+
+	EquipRArmClassicX = 975
+	EquipRArmClassicY = 190
+
+	EquipTorsClassicX = 833
+	EquipTorsClassicY = 210
+
+	EquipBeltClassicX = 833
+	EquipBeltClassicY = 300
+
+	EquipGlovClassicX = 700
+	EquipGlovClassicY = 315
+
+	EquipFeetClassicX = 975
+	EquipFeetClassicY = 315
+
+	EquipLRinClassicX = 770
+	EquipLRinClassicY = 300
+
+	EquipRRinClassicX = 905
+	EquipRRinClassicY = 300
+
+	EquipHeadX = 1005
+	EquipHeadY = 160
+
+	EquipNeckX = 1070
+	EquipNeckY = 205
+
+	EquipLArmX = 885
+	EquipLArmY = 215
+
+	EquipRArmX = 1135
+	EquipRArmY = 215
+
+	EquipTorsX = 1005
+	EquipTorsY = 260
+
+	EquipBeltX = 1005
+	EquipBeltY = 340
+
+	EquipGlovX = 885
+	EquipGlovY = 325
+
+	EquipFeetX = 1135
+	EquipFeetY = 325
+
+	EquipLRinX = 945
+	EquipLRinY = 340
+
+	EquipRRinX = 1070
+	EquipRRinY = 340
+
+	EquipMercHeadClassicX = 450
+	EquipMercHeadClassicY = 115
+
+	EquipMercLArmClassicX = 315
+	EquipMercLArmClassicY = 195
+
+	EquipMercRArmClassicX = 595
+	EquipMercRArmClassicY = 195
+
+	EquipMercTorsClassicX = 450
+	EquipMercTorsClassicY = 195
+
+	EquipMercHeadX = 275
+	EquipMercHeadY = 165
+
+	EquipMercLArmX = 150
+	EquipMercLArmY = 255
+
+	EquipMercRArmX = 400
+	EquipMercRArmY = 255
+
+	EquipMercTorsX = 275
+	EquipMercTorsY = 255
 )

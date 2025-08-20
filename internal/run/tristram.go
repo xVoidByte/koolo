@@ -14,6 +14,44 @@ import (
 	"github.com/hectorgimenez/koolo/internal/utils"
 )
 
+
+var TristramlStartingPosition = data.Position{
+	X: 25173,
+	Y: 5087,
+}
+
+var TristramClearPos1 = data.Position{
+	X: 25173,
+	Y: 5113,
+}
+
+var TristramClearPos2 = data.Position{
+	X: 25175,
+	Y: 5166,
+}
+
+var TristramClearPos3 = data.Position{
+	X: 25163,
+	Y: 5192,
+}	
+var TristramClearPos4 = data.Position{
+	X: 25139,
+	Y: 5186,
+}
+var TristramClearPos5 = data.Position{
+	X: 25126,
+	Y: 5167,
+}
+var TristramClearPos6 = data.Position{
+	X: 25122,
+	Y: 5151,
+}
+var TristramClearPos7 = data.Position{
+	X: 25123,
+	Y: 5140,	
+}
+
+
 type Tristram struct {
 	ctx *context.Status
 }
@@ -48,7 +86,7 @@ func (t Tristram) Run() error {
 	action.MoveToCoords(cairnStone.Position)
 
 	// Clear area around the portal
-	if t.ctx.CharacterCfg.Game.Tristram.ClearPortal || t.ctx.CharacterCfg.Game.Runs[0] == "leveling" {
+	if t.ctx.CharacterCfg.Game.Tristram.ClearPortal {
 		action.ClearAreaAroundPlayer(10, data.MonsterAnyFilter())
 	}
 
@@ -84,12 +122,29 @@ func (t Tristram) Run() error {
 			return !obj.Selectable
 		})
 	} else {
-		filter := data.MonsterAnyFilter()
-		if t.ctx.CharacterCfg.Game.Tristram.FocusOnElitePacks && t.ctx.CharacterCfg.Game.Runs[0] != "leveling" {
-			filter = data.MonsterEliteFilter()
-		}
 
-		return action.ClearCurrentLevel(false, filter)
+						t.ctx.CharacterCfg.Character.ClearPathDist = 25
+	if err := config.SaveSupervisorConfig(t.ctx.CharacterCfg.ConfigFolderName, t.ctx.CharacterCfg); err != nil {
+		t.ctx.Logger.Error("Failed to save character configuration: %s", err.Error())}
+		
+		t.ctx.Logger.Info("Clearing Tristram")
+		action.MoveToCoords(TristramlStartingPosition)
+		action.ClearAreaAroundPlayer(25, data.MonsterAnyFilter())
+		action.MoveToCoords(TristramClearPos1)
+		action.ClearAreaAroundPlayer(25, data.MonsterAnyFilter())
+		action.MoveToCoords(TristramClearPos2)
+		action.ClearAreaAroundPlayer(35, data.MonsterAnyFilter())
+		action.MoveToCoords(TristramClearPos3)
+		action.ClearAreaAroundPlayer(40, data.MonsterAnyFilter())
+		action.MoveToCoords(TristramClearPos4)
+		action.ClearAreaAroundPlayer(40, data.MonsterAnyFilter())
+		action.MoveToCoords(TristramClearPos5)
+		action.ClearAreaAroundPlayer(40, data.MonsterAnyFilter())
+		action.MoveToCoords(TristramClearPos6)
+		action.ClearAreaAroundPlayer(40, data.MonsterAnyFilter())
+		action.MoveToCoords(TristramClearPos7)
+		action.ClearAreaAroundPlayer(40, data.MonsterAnyFilter())
+	
 	}
 
 	return nil

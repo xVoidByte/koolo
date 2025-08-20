@@ -1,6 +1,9 @@
 @echo off
 setlocal enabledelayedexpansion
 
+:: Preserve UI and critical packages
+set GOGARBLE=!github.com/hectorgimenez/koolo/internal/server*,!github.com/hectorgimenez/koolo/internal/event*,!github.com/inkeliz/gowebview*
+
 :: Change to the script's directory
 cd /d "%~dp0"
 
@@ -62,16 +65,31 @@ goto :eof
 call :validate_environment
 if !errorlevel! neq 0 exit /b !errorlevel!
 
-:: Build Koolo binary
+:: Build Koolo binary with Garble
 call :print_header "Building Koolo Binary"
-call :print_step "Compiling Koolo"
 if "%1"=="" (set VERSION=dev) else (set VERSION=%1)
-go build -trimpath -tags static --ldflags -extldflags="-static" -ldflags="-s -w -H windowsgui -X 'github.com/hectorgimenez/koolo/internal/config.Version=%VERSION%'" -o build/koolo.exe ./cmd/koolo
+
+:: Generate unique build identifiers
+for /f "delims=" %%a in ('powershell -Command "[guid]::NewGuid().ToString()"') do set "BUILD_ID=%%a"
+for /f "delims=" %%b in ('powershell -Command "Get-Date -Format 'o'"') do set "BUILD_TIME=%%b"
+
+:: Build an obfuscated Koolo  binary
+call :print_step "Compiling Obfuscated Koolo executable"
+(
+    garble -literals=false -seed=random build -a -trimpath -tags static --ldflags "-s -w -H windowsgui -X 'main.buildID=%BUILD_ID%' -X 'main.buildTime=%BUILD_TIME%' -X 'github.com/hectorgimenez/koolo/internal/config.Version=%VERSION%'" -o "build\%BUILD_ID%.exe" ./cmd/koolo 2>&1
+) > garble.log
+
+:: Capture and style seed information
+for /f "tokens=4" %%s in ('findstr /C:"-seed chosen at random:" garble.log') do (
+    call :print_step "Obfuscation seed: !BUILD_ID!"
+)
+del garble.log
+
 if !errorlevel! neq 0 (
     call :print_error "Failed to build Koolo binary"
     exit /b 1
 )
-call :print_success "Successfully built koolo.exe"
+call :print_success "Successfully built obfuscated executable"
 
 :: Handle tools folder first
 call :print_header "Handling Tools"

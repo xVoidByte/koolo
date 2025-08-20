@@ -119,6 +119,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const novaSorceressOptions = document.querySelector('.nova-sorceress-options');
     const bossStaticThresholdInput = document.getElementById('novaBossStaticThreshold');
     const mosaicAssassinOptions = document.querySelector('.mosaic-assassin-options');
+	const runewordSearchInput = document.getElementById('search-runewords');
+    const useTeleportCheckbox = document.getElementById('characterUseTeleport');
+    const clearPathDistContainer = document.getElementById('clearPathDistContainer');
+    const clearPathDistInput = document.getElementById('clearPathDist');
+    const clearPathDistValue = document.getElementById('clearPathDistValue');
 
     if (bossStaticThresholdInput) {
         bossStaticThresholdInput.addEventListener('input', handleBossStaticThresholdChange);
@@ -151,6 +156,35 @@ document.addEventListener('DOMContentLoaded', function () {
         } else {
             noSettingsMessage.style.display = 'block';
         }
+    }
+    function toggleClearPathVisibility() {
+        if (useTeleportCheckbox && clearPathDistContainer) {
+            if (useTeleportCheckbox.checked) {
+                clearPathDistContainer.style.display = 'none';
+            } else {
+                clearPathDistContainer.style.display = 'block';
+            }
+        }
+    }
+
+    // Update the displayed value when the slider changes
+    function updateClearPathValue() {
+        if (clearPathDistInput && clearPathDistValue) {
+            clearPathDistValue.textContent = clearPathDistInput.value;
+        }
+    }
+
+    // Set up event listeners
+    if (useTeleportCheckbox) {
+        useTeleportCheckbox.addEventListener('change', toggleClearPathVisibility);
+        // Initialize visibility
+        toggleClearPathVisibility();
+    }
+
+    if (clearPathDistInput) {
+        clearPathDistInput.addEventListener('input', updateClearPathValue);
+        // Initialize value display
+        updateClearPathValue();
     }
     
     function updateNovaSorceressOptions() {
@@ -228,6 +262,39 @@ document.addEventListener('DOMContentLoaded', function () {
             checkbox.checked = e.target.checked;
         });
     });
+	
+	 function filterRunewords(searchTerm = '') { // Default parameter to ensure previously checked runewords show before searching
+        let listItems = document.querySelectorAll('.runeword-item');
+        searchTerm = searchTerm.toLowerCase();
+
+        listItems.forEach(function (item) {
+            const isChecked = item.querySelector('input[type="checkbox"]').checked;
+            const rwName = item.querySelector('.runeword-name').textContent.toLowerCase();
+
+            if (isChecked || (searchTerm && rwName.includes(searchTerm))) {
+                item.style.display = '';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    }
+
+    if (runewordSearchInput) {
+        runewordSearchInput.addEventListener('input', function () {
+            filterRunewords(runewordSearchInput.value);
+        });
+
+        document.addEventListener('change', function(e) {
+            if (e.target.matches('.runeword-item input[type="checkbox"]')) {
+                filterRunewords(runewordSearchInput.value);
+            }
+        });
+
+        filterRunewords();
+    }
+
+
+	
 });
 
 function handleBossStaticThresholdChange() {

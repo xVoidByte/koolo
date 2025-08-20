@@ -1,34 +1,45 @@
 package action
 
 import (
-	"github.com/hectorgimenez/d2go/pkg/data/area"
-	"github.com/hectorgimenez/d2go/pkg/data/difficulty"
 	"github.com/hectorgimenez/d2go/pkg/data/npc"
-	"github.com/hectorgimenez/koolo/internal/context"
+	botCtx "github.com/hectorgimenez/koolo/internal/context" // ALIAS THIS IMPORT
 	"github.com/hectorgimenez/koolo/internal/town"
 	"github.com/lxn/win"
+	"github.com/hectorgimenez/d2go/pkg/data/item"
+	"github.com/hectorgimenez/d2go/pkg/data/stat"
 )
 
+
 func ReviveMerc() {
-	ctx := context.Get()
-	ctx.SetLastAction("ReviveMerc")
+	
+	status := botCtx.Get()
 
-	_, isLevelingChar := ctx.Char.(context.LevelingCharacter)
-	if ctx.CharacterCfg.Character.UseMerc && ctx.Data.MercHPPercent() <= 0 {
-		if isLevelingChar && ctx.Data.PlayerUnit.Area == area.RogueEncampment && ctx.CharacterCfg.Game.Difficulty == difficulty.Normal {
-			// Ignoring because merc is not hired yet
-			return
-		}
+	status.SetLastAction("ReviveMerc") // SetLastAction is a method on Status
 
-		ctx.Logger.Info("Merc is dead, let's revive it!")
+	if status.CharacterCfg.Character.UseMerc && status.Data.MercHPPercent() <= 0 && NeedsTPsToContinue(status.Context) {
 
-		mercNPC := town.GetTownByArea(ctx.Data.PlayerUnit.Area).MercContractorNPC()
+		status.Logger.Info("Merc is dead, let's revive it!")
+
+		mercNPC := town.GetTownByArea(status.Data.PlayerUnit.Area).MercContractorNPC()
+
 		InteractNPC(mercNPC)
 
 		if mercNPC == npc.Tyrael2 {
-			ctx.HID.KeySequence(win.VK_END, win.VK_UP, win.VK_RETURN, win.VK_ESCAPE)
+			status.HID.KeySequence(win.VK_END, win.VK_UP, win.VK_RETURN, win.VK_ESCAPE)
 		} else {
-			ctx.HID.KeySequence(win.VK_HOME, win.VK_DOWN, win.VK_RETURN, win.VK_ESCAPE)
+			status.HID.KeySequence(win.VK_HOME, win.VK_DOWN, win.VK_RETURN, win.VK_ESCAPE)
 		}
 	}
+}
+
+// NeedsTPsToContinue now correctly accepts *botCtx.Context and checks for at least 1 TP
+func NeedsTPsToContinue(ctx *botCtx.Context) bool {
+	portalTome, found := ctx.Data.Inventory.Find(item.TomeOfTownPortal, item.LocationInventory)
+	if !found {
+		return false // No portal tome found, so no TPs, can't go to town.
+	}
+
+	qty, found := portalTome.FindStat(stat.Quantity, 0)
+	// If quantity stat isn't found, or if quantity is exactly 0, then we can't make a TP.
+	return qty.Value > 0 && found
 }

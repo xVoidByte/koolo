@@ -3,11 +3,17 @@ package game
 import (
 	"math"
 	"time"
+	
 
 	"github.com/hectorgimenez/d2go/pkg/data"
 	"github.com/hectorgimenez/d2go/pkg/data/area"
 	"github.com/hectorgimenez/d2go/pkg/data/skill"
 	"github.com/hectorgimenez/koolo/internal/config"
+	"github.com/hectorgimenez/d2go/pkg/data/stat"	
+	"github.com/hectorgimenez/d2go/pkg/data/difficulty"
+	"github.com/hectorgimenez/d2go/pkg/data/npc"
+	"github.com/hectorgimenez/d2go/pkg/data/quest"
+
 )
 
 type Data struct {
@@ -18,26 +24,91 @@ type Data struct {
 }
 
 func (d Data) CanTeleport() bool {
-	if !d.CharacterCfg.Character.UseTeleport {
-		return false
-	}
-	// In Duriel Lair we can teleport only in boss room
-	// Only enable Teleport in largest room where is Duriel
-	if d.PlayerUnit.Area == area.DurielsLair {
-		if len(d.AreaData.Rooms) > 0 {
-			bossRoom := d.AreaData.Rooms[0]
-			for _, room := range d.AreaData.Rooms {
-				if (room.Width * room.Height) > (bossRoom.Width * bossRoom.Height) {
-					bossRoom = room
-				}
-			}
-			return bossRoom.IsInside(d.PlayerUnit.Position)
-		}
+    // Check if teleport is generally enabled in character config
+    if !d.CharacterCfg.Character.UseTeleport {
+        return false
+    }
+
+    // Check if player has enough gold
+    if d.PlayerUnit.TotalPlayerGold() < 5000 {
+        return false
+    }
+	
+		// Disable teleport if in Arreat Summit and Act 5 Rite of Passage quest is completed
+	if d.PlayerUnit.Area == area.ArreatSummit && d.Quests[quest.Act5RiteOfPassage].Completed() {
 		return false
 	}
 
-	_, isTpBound := d.KeyBindings.KeyBindingForSkill(skill.Teleport)
-	return isTpBound && !d.PlayerUnit.Area.IsTown()
+	lvl, _ := d.PlayerUnit.FindStat(stat.Level, 0)
+    // Disable teleport in Normal difficulty for Act 1 and Act 2, with exceptions
+    if d.CharacterCfg.Game.Difficulty == difficulty.Normal && lvl.Value < 24 {
+        currentAct := d.PlayerUnit.Area.Act()
+        currentAreaID := d.PlayerUnit.Area //
+
+        allowedAct2NormalAreas := map[area.ID]bool{
+            area.MaggotLairLevel1: true,
+            area.MaggotLairLevel2: true,
+            area.MaggotLairLevel3: true,
+			area.ArcaneSanctuary: true,
+			area.ClawViperTempleLevel1: true,			
+			area.ClawViperTempleLevel2: true,
+			area.HaremLevel1: true, 
+			area.HaremLevel2: true, 
+			 area.PalaceCellarLevel1: true,
+			 area.PalaceCellarLevel2: true,
+			 area.PalaceCellarLevel3: true,
+        }
+
+        if currentAct == 1 {
+            return false // No teleport in Act 1 Normal
+        }
+
+         if currentAct == 2 {
+            // Check if the current area is one of the allowed exceptions in Act 2 Normal
+            if _, isAllowed := allowedAct2NormalAreas[currentAreaID]; !isAllowed {
+                // Check if the area is one of the tombs and the player is level 24 or higher
+                tombAreas := map[area.ID]bool{
+                    area.TalRashasTomb1: true,
+                    area.TalRashasTomb2: true,
+                    area.TalRashasTomb3: true,
+                    area.TalRashasTomb4: true,
+                    area.TalRashasTomb5: true,
+                    area.TalRashasTomb6: true,
+                    area.TalRashasTomb7: true,
+                }
+                
+                // Safely retrieve the player's level using FindStat, as shown in your example
+                lvl, _ := d.PlayerUnit.FindStat(stat.Level, 0)
+                
+                if _, isTomb := tombAreas[currentAreaID]; isTomb && lvl.Value >= 24 {
+                    return true // Allow teleport in tombs if level 24+
+                }
+                return false // Not an allowed exception, so disallow teleport
+            }
+        }
+    }
+
+	// In Duriel Lair, we can teleport only if Duriel is alive.
+	// If Duriel is not found or is dead, teleportation is disallowed.
+	if d.PlayerUnit.Area == area.DurielsLair {
+		duriel, found := d.Monsters.FindOne(npc.Duriel, data.MonsterTypeUnique)
+		// Allow teleport if Duriel is found and his life stat is greater than 0
+		if found && duriel.Stats[stat.Life] > 0 {
+			return true
+		}
+		return false // Disallow teleport if Duriel is not found or is dead
+	}
+	
+	    currentManaStat, foundMana := d.PlayerUnit.FindStat(stat.Mana, 0) //
+    if !foundMana || currentManaStat.Value < 24 { //
+        return false
+    }
+
+    // Check if the Teleport skill is bound to a key
+    _, isTpBound := d.KeyBindings.KeyBindingForSkill(skill.Teleport)
+
+    // Ensure Teleport is bound and the current area is not a town
+    return isTpBound && !d.PlayerUnit.Area.IsTown()
 }
 
 func (d Data) PlayerCastDuration() time.Duration {

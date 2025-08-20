@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"math"
-	"sync"
+	"math" // Needed for calculateDistance
+	"sync" // Added for mutex
 	"time"
 
 	"github.com/hectorgimenez/d2go/pkg/data"
@@ -24,10 +24,10 @@ import (
 
 type Bot struct {
 	ctx                   *botCtx.Context
-	lastActivityTimeMux   sync.Mutex 
-	lastActivityTime      time.Time 
-	lastKnownPosition     data.Position 
-	lastPositionCheckTime time.Time 
+	lastActivityTimeMux   sync.Mutex // Mutex to protect all activity-related timestamps and positions
+	lastActivityTime      time.Time  // Used for general bot process activity
+	lastKnownPosition     data.Position // For position-based idle detection
+	lastPositionCheckTime time.Time  // For position-based idle detection
 }
 
 // calculateDistance returns the Euclidean distance between two positions.
@@ -37,7 +37,9 @@ func calculateDistance(p1, p2 data.Position) float64 {
 	return math.Sqrt(dx*dx + dy*dy)
 }
 
-
+// NeedsTPsToContinue checks if the player has 0 Town Portals in their tome.
+// It returns true if 0 TPs are found, indicating a need to go back to town.
+// It returns false if more than 0 TPs are found.
 func (b *Bot) NeedsTPsToContinue() bool {
 	portalTome, found := b.ctx.Data.Inventory.Find(item.TomeOfTownPortal, item.LocationInventory)
 	if !found {
@@ -45,7 +47,8 @@ func (b *Bot) NeedsTPsToContinue() bool {
 	}
 
 	qty, found := portalTome.FindStat(stat.Quantity, 0)
-
+	// If quantity stat isn't found (shouldn't happen for a found item, but good to be safe),
+	// or if quantity is exactly 0, then we need TPs.
 	return qty.Value == 0 || !found
 }
 
@@ -58,7 +61,8 @@ func NewBot(ctx *botCtx.Context) *Bot {
 	}
 }
 
-
+// updateActivityAndPosition updates the last activity timestamp and the last known position
+// in a thread-safe manner. This is a combined update as both relate to "activity".
 func (b *Bot) updateActivityAndPosition() {
 	b.lastActivityTimeMux.Lock()
 	defer b.lastActivityTimeMux.Unlock()
@@ -114,12 +118,16 @@ func (b *Bot) Run(ctx context.Context, firstRun bool, runs []run.Run) error {
 				b.Stop()
 				return nil
 			case <-ticker.C:
-				if b.ctx.ExecutionPriority == botCtx.PriorityPause {
-					continue
-				}
 				b.ctx.RefreshGameData()
 				// Update activity here because the bot is actively refreshing game data.
 				b.updateActivityAndPosition()
+				// Log player coordinates for debugging, even when paused.
+				// No `continue` check here means this will run regardless of the bot's priority.
+				if b.ctx.ExecutionPriority == botCtx.PriorityPause {
+					b.ctx.Logger.Debug(fmt.Sprintf("Player position (paused): X=%d, Y=%d", b.ctx.Data.PlayerUnit.Position.X, b.ctx.Data.PlayerUnit.Position.Y))
+				} else {
+					b.ctx.Logger.Debug(fmt.Sprintf("Player position: X=%d, Y=%d", b.ctx.Data.PlayerUnit.Position.X, b.ctx.Data.PlayerUnit.Position.Y))
+				}
 			}
 		}
 	})
@@ -130,7 +138,7 @@ func (b *Bot) Run(ctx context.Context, firstRun bool, runs []run.Run) error {
 		ticker := time.NewTicker(100 * time.Millisecond)
 
 		const globalLongTermIdleThreshold = 2 * time.Minute // From move.go example
-		const minMovementThreshold = 30                    // From move.go example
+		const minMovementThreshold = 30                 // From move.go example
 
 		for {
 			select {
@@ -267,7 +275,9 @@ func (b *Bot) Run(ctx context.Context, firstRun bool, runs []run.Run) error {
 								b.ctx.CharacterCfg.BackToTown.EquipmentBroken && action.IsEquipmentBroken() ||
 								b.ctx.CharacterCfg.BackToTown.NoMpPotions && !manaPotsFound ||
 								b.ctx.CharacterCfg.BackToTown.MercDied && b.ctx.Data.MercHPPercent() <= 0 && b.ctx.CharacterCfg.Character.UseMerc) &&
-								!b.ctx.Data.PlayerUnit.Area.IsTown() {
+								!b.ctx.Data.PlayerUnit.Area.IsTown() ||
+								b.ctx.Data.PlayerUnit.HPPercent() < 50 && lvl.Value < 24 && !b.ctx.Data.PlayerUnit.Area.IsTown() ||
+								b.ctx.Data.PlayerUnit.MPPercent() < 2 && lvl.Value < 24 && !b.ctx.Data.PlayerUnit.Area.IsTown() {
 
 								// Log the exact reason for going back to town
 								var reason string
@@ -337,14 +347,10 @@ func (b *Bot) Run(ctx context.Context, firstRun bool, runs []run.Run) error {
 						runFinishReason = event.FinishedMercChicken
 					case errors.Is(err, health.ErrDied):
 						runFinishReason = event.FinishedDied
-					case errors.Is(err, errors.New("player idle for too long, quitting game")): // Match the specific error
+					case errors.Is(err, errors.New("bot globally idle for too long, quitting game")): // Match the specific error
 						runFinishReason = event.FinishedError
 					case errors.Is(err, errors.New("bot globally idle for too long (no movement), quitting game")): // Match the specific error for movement-based idle
 						runFinishReason = event.FinishedError
-					case errors.Is(err, errors.New("player stuck in an unrecoverable movement loop, quitting")): // Match the specific error for movement-based idle
-						runFinishReason = event.FinishedError	
-					case errors.Is(err, action.ErrFailedToEquip): // This is the new line
-					runFinishReason = event.FinishedError	
 					default:
 						runFinishReason = event.FinishedError
 					}

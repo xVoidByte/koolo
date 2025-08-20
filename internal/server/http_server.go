@@ -27,6 +27,7 @@ import (
 	"github.com/hectorgimenez/koolo/internal/bot"
 	"github.com/hectorgimenez/koolo/internal/config"
 	ctx "github.com/hectorgimenez/koolo/internal/context"
+	"github.com/hectorgimenez/koolo/internal/event"
 	"github.com/hectorgimenez/koolo/internal/game"
 	"github.com/hectorgimenez/koolo/internal/utils"
 	"github.com/hectorgimenez/koolo/internal/utils/winproc"
@@ -388,7 +389,20 @@ func (s *HttpServer) getStatusData() IndexData {
 	drops := make(map[string]int)
 
 	for _, supervisorName := range s.manager.AvailableSupervisors() {
-		status[supervisorName] = s.manager.Status(supervisorName)
+		stats := s.manager.Status(supervisorName)
+
+		// Check if this is a companion follower
+		cfg, found := config.Characters[supervisorName]
+		if found {
+			// Add companion information to the stats
+			if cfg.Companion.Enabled && !cfg.Companion.Leader {
+				// This is a companion follower
+				stats.IsCompanionFollower = true
+			}
+		}
+
+		status[supervisorName] = stats
+
 		if s.manager.GetSupervisorStats(supervisorName).Drops != nil {
 			drops[supervisorName] = len(s.manager.GetSupervisorStats(supervisorName).Drops)
 		} else {
@@ -419,9 +433,10 @@ func (s *HttpServer) Listen(port int) error {
 	http.HandleFunc("/drops", s.drops)
 	http.HandleFunc("/process-list", s.getProcessList)
 	http.HandleFunc("/attach-process", s.attachProcess)
-	http.HandleFunc("/ws", s.wsServer.HandleWebSocket)    // Web socket
-	http.HandleFunc("/initial-data", s.initialData)       // Web socket data
-	http.HandleFunc("/api/reload-config", s.reloadConfig) // New handler
+	http.HandleFunc("/ws", s.wsServer.HandleWebSocket)      // Web socket
+	http.HandleFunc("/initial-data", s.initialData)         // Web socket data
+	http.HandleFunc("/api/reload-config", s.reloadConfig)   // New handler
+	http.HandleFunc("/api/companion-join", s.companionJoin) // Companion join handler
 
 	assets, _ := fs.Sub(assetsFS, "assets")
 	http.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.FS(assets))))
@@ -791,10 +806,26 @@ func (s *HttpServer) characterSettings(w http.ResponseWriter, r *http.Request) {
 		cfg.Health.MercRejuvPotionAt, _ = strconv.Atoi(r.Form.Get("mercRejuvPotionAt"))
 		cfg.Health.MercChickenAt, _ = strconv.Atoi(r.Form.Get("mercChickenAt"))
 
-		// Character
+		// Character config section
 		cfg.Character.Class = r.Form.Get("characterClass")
 		cfg.Character.StashToShared = r.Form.Has("characterStashToShared")
 		cfg.Character.UseTeleport = r.Form.Has("characterUseTeleport")
+
+		// Process ClearPathDist - only relevant when teleport is disabled
+		if !cfg.Character.UseTeleport {
+			clearPathDist, err := strconv.Atoi(r.Form.Get("clearPathDist"))
+			if err == nil && clearPathDist >= 0 && clearPathDist <= 30 {
+				cfg.Character.ClearPathDist = clearPathDist
+			} else {
+				// Set default value if invalid
+				cfg.Character.ClearPathDist = 7
+				s.logger.Debug("Using default ClearPathDist value",
+					slog.Int("default", 7),
+					slog.String("input", r.Form.Get("clearPathDist")))
+			}
+		} else {
+			cfg.Character.ClearPathDist = 7
+		}
 
 		// Berserker Barb specific options
 		if cfg.Character.Class == "berserker" {
@@ -875,6 +906,9 @@ func (s *HttpServer) characterSettings(w http.ResponseWriter, r *http.Request) {
 		cfg.Game.Pit.OnlyClearLevel2 = r.Form.Has("gamePitOnlyClearLevel2")
 
 		cfg.Game.Andariel.ClearRoom = r.Form.Has("gameAndarielClearRoom")
+		cfg.Game.Andariel.UseAntidoes = r.Form.Has("gameAndarielUseAntidoes")
+
+		cfg.Game.Countess.ClearFloors = r.Form.Has("gameCountessClearFloors")
 
 		cfg.Game.Pindleskin.SkipOnImmunities = []stat.Resist{}
 		for _, i := range r.Form["gamePindleskinSkipOnImmunities[]"] {
@@ -885,6 +919,7 @@ func (s *HttpServer) characterSettings(w http.ResponseWriter, r *http.Request) {
 		cfg.Game.StonyTomb.FocusOnElitePacks = r.Form.Has("gameStonytombFocusOnElitePacks")
 		cfg.Game.AncientTunnels.OpenChests = r.Form.Has("gameAncientTunnelsOpenChests")
 		cfg.Game.AncientTunnels.FocusOnElitePacks = r.Form.Has("gameAncientTunnelsFocusOnElitePacks")
+		cfg.Game.Duriel.UseThawing = r.Form.Has("gameDurielUseThawing")
 		cfg.Game.Mausoleum.OpenChests = r.Form.Has("gameMausoleumOpenChests")
 		cfg.Game.Mausoleum.FocusOnElitePacks = r.Form.Has("gameMausoleumFocusOnElitePacks")
 		cfg.Game.DrifterCavern.OpenChests = r.Form.Has("gameDrifterCavernOpenChests")
@@ -926,6 +961,11 @@ func (s *HttpServer) characterSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		cfg.Game.Leveling.EnsurePointsAllocation = r.Form.Has("gameLevelingEnsurePointsAllocation")
 		cfg.Game.Leveling.EnsureKeyBinding = r.Form.Has("gameLevelingEnsureKeyBinding")
+		cfg.Game.Leveling.AutoEquip = r.Form.Has("gameLevelingAutoEquip")
+			// Socket Recipes
+		cfg.Game.Leveling.EnableRunewordMaker = r.Form.Has("gameLevelingEnableRunewordMaker")
+		enabledRunewordRecipes := r.Form["gameLevelingEnabledRunewordRecipes"]
+		cfg.Game.Leveling.EnabledRunewordRecipes = enabledRunewordRecipes
 
 		// Quests options for Act 1
 		cfg.Game.Quests.ClearDen = r.Form.Has("gameQuestsClearDen")
@@ -968,9 +1008,9 @@ func (s *HttpServer) characterSettings(w http.ResponseWriter, r *http.Request) {
 		cfg.CubeRecipes.EnabledRecipes = enabledRecipes
 		cfg.CubeRecipes.SkipPerfectAmethysts = r.Form.Has("skipPerfectAmethysts")
 		cfg.CubeRecipes.SkipPerfectRubies = r.Form.Has("skipPerfectRubies")
-		// Companion
 
 		// Companion config
+		cfg.Companion.Enabled = r.Form.Has("companionEnabled")
 		cfg.Companion.Leader = r.Form.Has("companionLeader")
 		cfg.Companion.LeaderName = r.Form.Get("companionLeaderName")
 		cfg.Companion.GameNameTemplate = r.Form.Get("companionGameNameTemplate")
@@ -1030,5 +1070,52 @@ func (s *HttpServer) characterSettings(w http.ResponseWriter, r *http.Request) {
 		DisabledRuns: disabledRuns,
 		AvailableTZs: availableTZs,
 		RecipeList:   config.AvailableRecipes,
+		RunewordRecipeList: config.AvailableRunewordRecipes,
 	})
+}
+
+// companionJoin handles requests to force a companion to join a game
+func (s *HttpServer) companionJoin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var requestData struct {
+		Supervisor string `json:"supervisor"`
+		GameName   string `json:"gameName"`
+		Password   string `json:"password"`
+	}
+
+	err := json.NewDecoder(r.Body).Decode(&requestData)
+	if err != nil {
+		http.Error(w, "Invalid request data", http.StatusBadRequest)
+		return
+	}
+
+	// Check if the supervisor exists and is a companion
+	cfg, found := config.Characters[requestData.Supervisor]
+	if !found {
+		http.Error(w, "Supervisor not found", http.StatusNotFound)
+		return
+	}
+
+	if !cfg.Companion.Enabled || cfg.Companion.Leader {
+		http.Error(w, "Supervisor is not a companion follower", http.StatusBadRequest)
+		return
+	}
+
+	// Create and send the event
+	baseEvent := event.Text(requestData.Supervisor, fmt.Sprintf("Manual request to join game %s", requestData.GameName))
+	joinEvent := event.RequestCompanionJoinGame(baseEvent, cfg.CharacterName, requestData.GameName, requestData.Password)
+
+	// Send the event
+	event.Send(joinEvent)
+
+	s.logger.Info("Manual companion join request sent",
+		slog.String("supervisor", requestData.Supervisor),
+		slog.String("game", requestData.GameName))
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }

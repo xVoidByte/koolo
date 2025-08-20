@@ -140,6 +140,7 @@ func (d *Diablo) Run() error {
 		}
 
 		return d.ctx.Char.KillDiablo()
+		
 	}
 
 	return nil

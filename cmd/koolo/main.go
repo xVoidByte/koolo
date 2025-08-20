@@ -21,6 +21,11 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+var (
+	buildID   string
+	buildTime string
+)
+
 // wrapWithRecover wraps a function with panic recovery logic
 func wrapWithRecover(logger *slog.Logger, f func() error) func() error {
 	return func() error {
@@ -37,6 +42,10 @@ func wrapWithRecover(logger *slog.Logger, f func() error) func() error {
 }
 
 func main() {
+
+	_ = buildID
+	_ = buildTime
+
 	err := config.Load()
 	if err != nil {
 		utils.ShowDialog("Error loading configuration", err.Error())

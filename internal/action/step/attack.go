@@ -16,10 +16,12 @@ import (
 )
 
 const attackCycleDuration = 120 * time.Millisecond
+const repositionCooldown = 2 * time.Second // Constant for repositioning cooldown
 
 var (
-	statesMutex   sync.RWMutex
-	monsterStates = make(map[data.UnitID]*attackState)
+	statesMutex           sync.RWMutex
+	monsterStates         = make(map[data.UnitID]*attackState)
+	ErrMonsterUnreachable = errors.New("monster appears to be unreachable or unkillable")
 )
 
 // Contains all configuration for an attack sequence
@@ -44,6 +46,8 @@ type attackState struct {
 	lastHealth             int
 	lastHealthCheckTime    time.Time
 	failedAttemptStartTime time.Time
+	lastRepositionTime     time.Time
+	repositionAttempts     int
 	position               data.Position
 }
 
@@ -180,14 +184,21 @@ func attack(settings attackSettings) error {
 		}
 
 		// Check if we need to reposition if we aren't doing any damage (prevent attacking through doors etc.)
-		_, state := checkMonsterDamage(monster)
+		_, state := checkMonsterDamage(monster) // Get the state
 		needsRepositioning := !state.failedAttemptStartTime.IsZero() &&
 			time.Since(state.failedAttemptStartTime) > 3*time.Second
 
-		// Be sure we stay in range of the enemy
-		err := ensureEnemyIsInRange(monster, settings.maxDistance, settings.minDistance, needsRepositioning)
+		// Be sure we stay in range of the enemy. ensureEnemyIsInRange will handle reposition attempts.
+		err := ensureEnemyIsInRange(monster, state, settings.maxDistance, settings.minDistance, needsRepositioning)
 		if err != nil {
-			return fmt.Errorf("enemy is out of range and cannot be reached: %w", err)
+			if errors.Is(err, ErrMonsterUnreachable) {
+				ctx.Logger.Info(fmt.Sprintf("Giving up on monster [%d] (Area: %s) due to unreachability/unkillability.", monster.Name, ctx.Data.PlayerUnit.Area.Area().Name))
+				statesMutex.Lock()
+				delete(monsterStates, settings.target) // Clean up state for this monster
+				statesMutex.Unlock()
+				return nil // Return nil, allowing the higher-level action to find a new monster or finish.
+			}
+			return err // Propagate other errors from ensureEnemyIsInRange
 		}
 
 		// Handle aura activation
@@ -218,9 +229,17 @@ func burstAttack(settings attackSettings) error {
 	}
 
 	// Initially we try to move to the enemy, later we will check for closer enemies to keep attacking
-	err := ensureEnemyIsInRange(monster, settings.maxDistance, settings.minDistance, false)
+	_, state := checkMonsterDamage(monster)                                                        // Get the state for the initial monster
+	err := ensureEnemyIsInRange(monster, state, settings.maxDistance, settings.minDistance, false) // No initial repositioning check for burst
 	if err != nil {
-		return fmt.Errorf("enemy is out of range and cannot be reached: %w", err)
+		if errors.Is(err, ErrMonsterUnreachable) {
+			ctx.Logger.Info(fmt.Sprintf("Giving up on initial monster [%d] (Area: %s) due to unreachability/unkillability during burst.", monster.Name, ctx.Data.PlayerUnit.Area.Area().Name))
+			statesMutex.Lock()
+			delete(monsterStates, monster.UnitID) // Clean up state for this monster
+			statesMutex.Unlock()
+			return nil // Exit burst attack, caller will find next target.
+		}
+		return err // Propagate error from initial range check
 	}
 
 	startedAt := time.Now()
@@ -232,10 +251,10 @@ func burstAttack(settings attackSettings) error {
 		}
 
 		target := data.Monster{}
-		for _, monster = range ctx.Data.Monsters.Enemies() {
-			distance := ctx.PathFinder.DistanceFromMe(monster.Position)
-			if isValidEnemy(monster, ctx) && distance <= settings.maxDistance {
-				target = monster
+		for _, m := range ctx.Data.Monsters.Enemies() { // Changed 'monster' to 'm' to avoid shadowing
+			distance := ctx.PathFinder.DistanceFromMe(m.Position)
+			if isValidEnemy(m, ctx) && distance <= settings.maxDistance {
+				target = m
 				break
 			}
 		}
@@ -244,18 +263,27 @@ func burstAttack(settings attackSettings) error {
 			return nil // We have no valid targets in range, finish attack sequence
 		}
 
-		// Check if we need to reposition if we aren't doing any damage (prevent attacking through doors etc.
-		_, state := checkMonsterDamage(target)
+		// Check if we need to reposition if we aren't doing any damage
+		_, state = checkMonsterDamage(target) // Get the state for the current target
+
 		needsRepositioning := !state.failedAttemptStartTime.IsZero() &&
 			time.Since(state.failedAttemptStartTime) > 3*time.Second
 
 		// If we don't have LoS we will need to interrupt and move :(
 		if !ctx.PathFinder.LineOfSight(ctx.Data.PlayerUnit.Position, target.Position) || needsRepositioning {
-			err = ensureEnemyIsInRange(target, settings.maxDistance, settings.minDistance, needsRepositioning)
+			// ensureEnemyIsInRange will handle reposition attempts and return nil if it skips
+			err = ensureEnemyIsInRange(target, state, settings.maxDistance, settings.minDistance, needsRepositioning)
 			if err != nil {
-				return fmt.Errorf("enemy is out of range and cannot be reached: %w", err)
+				if errors.Is(err, ErrMonsterUnreachable) { // HANDLE NEW ERROR
+					ctx.Logger.Info(fmt.Sprintf("Giving up on monster [%d] (Area: %s) due to unreachability/unkillability during burst.", target.Name, ctx.Data.PlayerUnit.Area.Area().Name))
+					statesMutex.Lock()
+					delete(monsterStates, target.UnitID) // Clean up state for this monster
+					statesMutex.Unlock()
+					return nil // Exit burst attack, caller will find next target.
+				}
+				return err // Propagate general errors from ensureEnemyIsInRange
 			}
-			continue
+			continue // Continue loop to re-evaluate conditions after a potential move
 		}
 
 		performAttack(ctx, settings, target.Position.X, target.Position.Y)
@@ -264,7 +292,7 @@ func burstAttack(settings attackSettings) error {
 
 func performAttack(ctx *context.Status, settings attackSettings, x, y int) {
 	monsterPos := data.Position{X: x, Y: y}
-	if !ctx.PathFinder.LineOfSight(ctx.Data.PlayerUnit.Position, monsterPos) {
+	if !ctx.PathFinder.LineOfSight(ctx.Data.PlayerUnit.Position, monsterPos) && !ctx.ForceAttack {
 		return // Skip attack if no line of sight
 	}
 
@@ -290,40 +318,67 @@ func performAttack(ctx *context.Status, settings attackSettings, x, y int) {
 	}
 }
 
-func ensureEnemyIsInRange(monster data.Monster, maxDistance, minDistance int, needsRepositioning bool) error {
+// Modified: Added 'state' parameter to manage lastRepositionTime and repositionAttempts
+func ensureEnemyIsInRange(monster data.Monster, state *attackState, maxDistance, minDistance int, needsRepositioning bool) error {
 	ctx := context.Get()
 	ctx.SetLastStep("ensureEnemyIsInRange")
 
-	// TODO: Add an option for telestomp based on the char configuration and kite
 	currentPos := ctx.Data.PlayerUnit.Position
 	distanceToMonster := ctx.PathFinder.DistanceFromMe(monster.Position)
 	hasLoS := ctx.PathFinder.LineOfSight(currentPos, monster.Position)
 
-	// We have line of sight, and we are inside the attack range, we can skip
+	// If we are already in range, have LoS, and don't need repositioning, we are good.
+	// Reset repositionAttempts for future needs.
 	if hasLoS && distanceToMonster <= maxDistance && !needsRepositioning {
+		state.repositionAttempts = 0 // Reset attempts if we're in a good state
 		return nil
 	}
-	// Handle repositioning if needed
+
+	// Handle repositioning if needed (due to no damage, or no LoS for burst attacks)
 	if needsRepositioning {
+		// If we've already tried repositioning once for this "stuck" phase
+		if state.repositionAttempts >= 1 { // This is the problematic part. User wants to allow 1 attempt.
+			ctx.Logger.Info(fmt.Sprintf(
+				"Already attempted repositioning for monster [%d] in area [%s]. Skipping further attempts and considering monster unkillable.", // Updated log message
+				monster.Name, ctx.Data.PlayerUnit.Area.Area().Name,
+			))
+			return ErrMonsterUnreachable // <-- CHANGE: Return specific error
+		}
+
+		// Check if enough time has passed since the last reposition attempt (cooldown)
+		if time.Since(state.lastRepositionTime) < repositionCooldown {
+			return nil // Still on cooldown, do not reposition yet. Return nil to continue attacking.
+		}
+
 		ctx.Logger.Info(fmt.Sprintf(
-			"No damage taken by target monster [%d] in area [%s] for more than 3 seconds. Trying to re-position",
-			monster.Name, // No mapped string value for npc names in d2go, only id
-			ctx.Data.PlayerUnit.Area.Area().Name,
+			"No damage taken by target monster [%d] in area [%s] for more than 3 seconds. Trying to re-position (attempt %d/1)",
+			monster.Name, ctx.Data.PlayerUnit.Area.Area().Name, state.repositionAttempts+1,
 		))
+
 		dest := ctx.PathFinder.BeyondPosition(currentPos, monster.Position, 4)
-		return MoveTo(dest)
+		err := MoveTo(dest)
+		state.repositionAttempts++ // Increment attempt count after trying to move
+		if err != nil {
+			ctx.Logger.Error(fmt.Sprintf("MoveTo failed during reposition attempt for monster [%d]: %v", monster.Name, err))
+			// Do NOT update lastRepositionTime here if MoveTo completely failed, so it can try again sooner if the path clears.
+			// However, since we're only allowing ONE attempt, the increment of repositionAttempts handles the "give up" logic.
+			return nil // Continue attacking, but the next loop iteration will hit repositionAttempts >= 1 and return ErrMonsterUnreachable
+		}
+		state.lastRepositionTime = time.Now() // Update the last reposition time only if MoveTo was initiated without error
+		return nil                            // Successfully initiated the move, continue attacking next loop iteration
 	}
 
 	// Any close-range combat (mosaic,barb...) should move directly to target
+	// This is general movement, not triggered by needsRepositioning (no damage), so don't touch repositionAttempts.
 	if maxDistance <= 3 {
 		return MoveTo(monster.Position)
 	}
 
 	// Get path to monster
 	path, _, found := ctx.PathFinder.GetPath(monster.Position)
-	// We cannot reach the enemy, let's skip the attack sequence
+	// We cannot reach the enemy, let's skip the attack sequence by returning an error
 	if !found {
-		return errors.New("path could not be calculated")
+		return errors.New("path could not be calculated to reach monster") // This is a fundamental pathing error, propagate it.
 	}
 
 	// Look for suitable position along path
@@ -344,12 +399,13 @@ func ensureEnemyIsInRange(monster data.Monster, maxDistance, minDistance int, ne
 			dest = ctx.PathFinder.BeyondPosition(currentPos, dest, 9)
 		}
 
-		if ctx.PathFinder.LineOfSight(dest, monster.Position) {
+		if ctx.PathFinder.LineOfSight(dest, monster.Position) && !ctx.ForceAttack {
+			// This is also general movement to get into attack range, not a "repositioning attempt" for being stuck.
 			return MoveTo(dest)
 		}
 	}
 
-	return nil
+	return nil // No suitable position found along path, continue attacking
 }
 
 func checkMonsterDamage(monster data.Monster) (bool, *attackState) {
@@ -362,6 +418,7 @@ func checkMonsterDamage(monster data.Monster) (bool, *attackState) {
 			lastHealth:          monster.Stats[stat.Life],
 			lastHealthCheckTime: time.Now(),
 			position:            monster.Position,
+			repositionAttempts:  0, // Initialize counter to 0 for new states
 		}
 		monsterStates[monster.UnitID] = state
 	}
@@ -374,9 +431,11 @@ func checkMonsterDamage(monster data.Monster) (bool, *attackState) {
 		if currentHealth < state.lastHealth {
 			didDamage = true
 			state.failedAttemptStartTime = time.Time{}
+			state.repositionAttempts = 0 // Reset attempts when damage is successfully dealt
 		} else if state.failedAttemptStartTime.IsZero() &&
 			monster.Position == state.position { // only start failing if monster hasn't moved
 			state.failedAttemptStartTime = time.Now()
+			state.repositionAttempts = 0 // Reset attempts when starting a new failed phase
 		}
 
 		state.lastHealth = currentHealth

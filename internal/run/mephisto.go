@@ -1,6 +1,8 @@
 package run
 
 import (
+	"time"
+
 	"github.com/hectorgimenez/d2go/pkg/data"
 	"github.com/hectorgimenez/d2go/pkg/data/area"
 	"github.com/hectorgimenez/d2go/pkg/data/npc"
@@ -9,11 +11,26 @@ import (
 	"github.com/hectorgimenez/koolo/internal/config"
 	"github.com/hectorgimenez/koolo/internal/context"
 	"github.com/hectorgimenez/koolo/internal/utils"
+	"github.com/lxn/win"
 )
 
 type Mephisto struct {
 	ctx                *context.Status
-	clearMonsterFilter data.MonsterFilter // Used to clear area (basically TZ)
+	clearMonsterFilter data.MonsterFilter
+}
+
+func (m Mephisto) ToKeyBinding(keyCode byte) data.KeyBinding {
+	return data.KeyBinding{
+		Key1: [2]byte{keyCode, 0},
+		Key2: [2]byte{0, 0},
+	}
+}
+
+func (m Mephisto) HoldKey(keyCode byte, durationMs int) {
+	kb := m.ToKeyBinding(keyCode)
+	m.ctx.HID.KeyDown(kb)
+	time.Sleep(time.Duration(durationMs) * time.Millisecond)
+	m.ctx.HID.KeyUp(kb)
 }
 
 func NewMephisto(tzClearFilter data.MonsterFilter) *Mephisto {
@@ -46,6 +63,23 @@ func (m Mephisto) Run() error {
 		return err
 	}
 
+	_, isLevelingChar := m.ctx.Char.(context.LevelingCharacter)
+	if isLevelingChar {
+
+		action.ReturnTown()
+		action.IdentifyAll(false)
+		action.Stash(false)
+		action.ReviveMerc()
+		action.Repair()
+		action.VendorRefill(true, true)
+
+		err = action.UsePortalInTown()
+		if err != nil {
+			return err
+		}
+
+	}
+
 	// Move to the Safe position
 	action.MoveToCoords(data.Position{
 		X: 17568,
@@ -66,15 +100,34 @@ func (m Mephisto) Run() error {
 	}
 
 	if m.ctx.CharacterCfg.Game.Mephisto.OpenChests || m.ctx.CharacterCfg.Game.Mephisto.KillCouncilMembers {
-		// Clear the area with the selected options
+
 		return action.ClearCurrentLevel(m.ctx.CharacterCfg.Game.Mephisto.OpenChests, m.CouncilMemberFilter())
 	}
 
 	if m.ctx.CharacterCfg.Game.Mephisto.ExitToA4 {
+
+		_, isLevelingChar := m.ctx.Char.(context.LevelingCharacter)
+		if isLevelingChar {
+			action.MoveToCoords(data.Position{
+				X: 17568,
+				Y: 8069,
+			})
+
+			if err = action.ClearAreaAroundPlayer(30, m.MephistoFilter()); err != nil {
+				return err
+			}
+		}
+
 		m.ctx.Logger.Debug("Moving to bridge")
 		action.MoveToCoords(data.Position{X: 17588, Y: 8068})
 		//Wait for bridge to rise
 		utils.Sleep(1000)
+
+		if isLevelingChar {
+			if err = action.ClearAreaAroundPlayer(30, m.MephistoFilter()); err != nil {
+				return err
+			}
+		}
 
 		m.ctx.Logger.Debug("Moving to red portal")
 		portal, _ := m.ctx.Data.Objects.FindOne(object.HellGate)
@@ -83,6 +136,14 @@ func (m Mephisto) Run() error {
 		action.InteractObject(portal, func() bool {
 			return m.ctx.Data.PlayerUnit.Area == area.ThePandemoniumFortress
 		})
+
+		if isLevelingChar {
+			utils.Sleep(1000)
+			m.HoldKey(win.VK_ESCAPE, 2000)
+
+			utils.Sleep(1000)
+
+		}
 	}
 
 	return nil
@@ -93,6 +154,19 @@ func (m Mephisto) CouncilMemberFilter() data.MonsterFilter {
 		var filteredMonsters []data.Monster
 		for _, mo := range m {
 			if mo.Name == npc.CouncilMember || mo.Name == npc.CouncilMember2 || mo.Name == npc.CouncilMember3 {
+				filteredMonsters = append(filteredMonsters, mo)
+			}
+		}
+
+		return filteredMonsters
+	}
+}
+
+func (m Mephisto) MephistoFilter() data.MonsterFilter {
+	return func(m data.Monsters) []data.Monster {
+		var filteredMonsters []data.Monster
+		for _, mo := range m {
+			if mo.Name == npc.Mephisto {
 				filteredMonsters = append(filteredMonsters, mo)
 			}
 		}

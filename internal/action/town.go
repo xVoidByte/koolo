@@ -33,6 +33,11 @@ func PreRun(firstRun bool) error {
 	// Identify - either via Cain or Tome
 	IdentifyAll(false)
 
+	_, isLevelingChar := ctx.Char.(context.LevelingCharacter)
+	if ctx.CharacterCfg.Game.Leveling.AutoEquip && isLevelingChar {
+		AutoEquip()
+	}
+
 	// Stash before vendor
 	Stash(false)
 
@@ -46,6 +51,7 @@ func PreRun(firstRun bool) error {
 	Stash(false)
 
 	CubeRecipes()
+	MakeRunewords()
 
 	// Leveling related checks
 	if ctx.CharacterCfg.Game.Leveling.EnsurePointsAllocation {
@@ -68,6 +74,8 @@ func PreRun(firstRun bool) error {
 func InRunReturnTownRoutine() error {
 	ctx := context.Get()
 
+	ctx.PauseIfNotPriority()
+
 	if err := ReturnTown(); err != nil {
 		return fmt.Errorf("failed to return to town: %w", err)
 	}
@@ -77,36 +85,60 @@ func InRunReturnTownRoutine() error {
 		return fmt.Errorf("failed to verify town location after portal")
 	}
 
+
 	step.SetSkill(skill.Vigor)
 	RecoverCorpse()
+	ctx.PauseIfNotPriority() // Check after RecoverCorpse
 	ManageBelt()
+	ctx.PauseIfNotPriority() // Check after ManageBelt
 
 	// Let's stash items that need to be left unidentified
 	if ctx.CharacterCfg.Game.UseCainIdentify && HaveItemsToStashUnidentified() {
 		Stash(false)
+		ctx.PauseIfNotPriority() // Check after Stash
 	}
 
 	IdentifyAll(false)
+	
+
+	_, isLevelingChar := ctx.Char.(context.LevelingCharacter)
+	if ctx.CharacterCfg.Game.Leveling.AutoEquip && isLevelingChar {
+		AutoEquip()
+		ctx.PauseIfNotPriority() // Check after AutoEquip
+	}
 
 	VendorRefill(false, true)
+	ctx.PauseIfNotPriority() // Check after VendorRefill
 	Stash(false)
+	ctx.PauseIfNotPriority() // Check after Stash
 	Gamble()
+	ctx.PauseIfNotPriority() // Check after Gamble
 	Stash(false)
+	ctx.PauseIfNotPriority() // Check after Stash
 	CubeRecipes()
+	ctx.PauseIfNotPriority() // Check after CubeRecipes
+	MakeRunewords()
 
 	if ctx.CharacterCfg.Game.Leveling.EnsurePointsAllocation {
 		EnsureStatPoints()
+		ctx.PauseIfNotPriority() // Check after EnsureStatPoints
 		EnsureSkillPoints()
+		ctx.PauseIfNotPriority() // Check after EnsureSkillPoints
 	}
 
 	if ctx.CharacterCfg.Game.Leveling.EnsureKeyBinding {
 		EnsureSkillBindings()
+		ctx.PauseIfNotPriority() // Check after EnsureSkillBindings
 	}
 
 	HealAtNPC()
+	ctx.PauseIfNotPriority() // Check after HealAtNPC
 	ReviveMerc()
+	ctx.PauseIfNotPriority() // Check after ReviveMerc
 	HireMerc()
+	ctx.PauseIfNotPriority() // Check after HireMerc
 	Repair()
+	ctx.PauseIfNotPriority() // Check after Repair
 	
 	if (ctx.CharacterCfg.Companion.Leader) {
 		UsePortalInTown()

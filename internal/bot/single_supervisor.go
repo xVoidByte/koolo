@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/hectorgimenez/d2go/pkg/data/skill"
@@ -41,10 +42,15 @@ func NewSinglePlayerSupervisor(name string, bot *Bot, statsHandler *StatsHandler
 	}, nil
 }
 
-// Start will return error if it can not be started, otherwise will always return nil
+// Define a new error type for unrecoverable client state
+var ErrUnrecoverableClientState = errors.New("unrecoverable client state, forcing restart")
+
+// Start will return error if it can be started, otherwise will always return nil
 func (s *SinglePlayerSupervisor) Start() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancelFn = cancel
+
+	needToWait := true
 
 	err := s.ensureProcessIsRunningAndPrepare()
 	if err != nil {
@@ -52,46 +58,82 @@ func (s *SinglePlayerSupervisor) Start() error {
 	}
 
 	firstRun := true
-	for {
+	var timeSpentNotInGameStart time.Time
+	timeSpentNotInGameStart = time.Now()
+	const maxTimeNotInGame = 3 * time.Minute
+
+	for { // This is the main game loop
 		select {
 		case <-ctx.Done():
 			return nil
 		default:
-			if firstRun {
+			if firstRun && needToWait {
 				err = s.waitUntilCharacterSelectionScreen()
 				if err != nil {
 					return fmt.Errorf("error waiting for character selection screen: %w", err)
 				}
+				needToWait = false
 			}
 
-			// By this point, we should be in the character selection screen.
+			// Always log the in-game status
+			s.bot.ctx.Logger.Debug(fmt.Sprintf("Checking game status. Currently InGame: %t", s.bot.ctx.Manager.InGame())) // Changed to Debug
+
+			// Check if we are currently NOT in a game
 			if !s.bot.ctx.Manager.InGame() {
-				// Create the game
-				if err = s.HandleOutOfGameFlow(); err != nil {
-					// Ignore loading screen errors or unhandled errors (for now) and try again
+				// We are outside a game. Check if we've been outside for too long.
+				if time.Since(timeSpentNotInGameStart) > maxTimeNotInGame {
+					s.bot.ctx.Logger.Error(fmt.Sprintf("Bot has been outside of a game for more than %s. Forcing client restart.", maxTimeNotInGame))
+					if killErr := s.KillClient(); killErr != nil {
+						s.bot.ctx.Logger.Error(fmt.Sprintf("Error killing client after timeout: %s", killErr.Error()))
+					}
+					// If KillClient fails, or if it was called because of timeout, this error signals to restart the entire client
+					return ErrUnrecoverableClientState
+				}
+
+				// Attempt to create/join a game
+				if err = s.HandleMenuFlow(); err != nil {
+					if errors.Is(err, ErrUnrecoverableClientState) {
+						s.bot.ctx.Logger.Error(fmt.Sprintf("Unrecoverable client state detected: %s. Forcing client restart.", err.Error()))
+						return err // Propagate this specific error up to the manager to trigger a client restart
+					}
+
 					if err.Error() == "loading screen" || err.Error() == "" {
+						utils.Sleep(100)
+						continue
+					} else if err.Error() == "idle" {
+						s.bot.ctx.Logger.Info("[Companion] Idling in character selection screen while waiting for Leader to create new game", slog.String("supervisor", s.name))
 						utils.Sleep(100)
 						continue
 					}
 
-					s.bot.ctx.Logger.Error(fmt.Sprintf("Error creating new game: %s", err.Error()))
+					s.bot.ctx.Logger.Error(fmt.Sprintf("Error during menu flow: %s", err.Error()))
+					utils.Sleep(1000)
 					continue
 				}
+			} else {
+				s.bot.ctx.Logger.Debug("Bot is currently IN a game. Resetting 'time spent outside game' timer.") // Changed to Debug
+				timeSpentNotInGameStart = time.Now()
 			}
 
 			runs := run.BuildRuns(s.bot.ctx.CharacterCfg)
-			gameStart := time.Now()
+			gameStart := time.Now() // Declared and used below
 			if config.Characters[s.name].Game.RandomizeRuns {
 				rand.Shuffle(len(runs), func(i, j int) { runs[i], runs[j] = runs[j], runs[i] })
 			}
+
 			event.Send(event.GameCreated(event.Text(s.name, "New game created"), s.bot.ctx.GameReader.LastGameName(), s.bot.ctx.GameReader.LastGamePass()))
+
+			s.bot.ctx.CurrentGame.FailedToCreateGameAttempts = 0
+
 			s.bot.ctx.LastBuffAt = time.Time{}
 			s.logGameStart(runs)
 
-			// Refresh game data to make sure we have the latest information
 			s.bot.ctx.RefreshGameData()
 
-			// Perform keybindings check on the first run only
+			if s.bot.ctx.CharacterCfg.Companion.Enabled && s.bot.ctx.CharacterCfg.Companion.Leader {
+				event.Send(event.RequestCompanionJoinGame(event.Text(s.name, "New Game Started "+s.bot.ctx.Data.Game.LastGameName), s.bot.ctx.CharacterCfg.CharacterName, s.bot.ctx.Data.Game.LastGameName, s.bot.ctx.Data.Game.LastGamePassword))
+			}
+
 			if firstRun {
 				missingKeybindings := s.bot.ctx.Char.CheckKeyBindings()
 				if len(missingKeybindings) > 0 {
@@ -101,16 +143,52 @@ func (s *SinglePlayerSupervisor) Start() error {
 					}
 					missingKeybindingsText += "\nPlease bind the skills. Pausing bot..."
 
-					utils.ShowDialog("Missing keybindings for "+s.bot.ctx.Name, missingKeybindingsText)
+					utils.ShowDialog("Missing keybindings for "+s.name, missingKeybindingsText)
 					s.TogglePause()
 				}
 			}
 
-			err = s.bot.Run(ctx, firstRun, runs)
+			err = s.bot.Run(ctx, firstRun, runs) 
 			firstRun = false
 
-			var gameFinishReason event.FinishReason
-			if err != nil {
+			if err != nil { 
+			
+				s.bot.ctx.Logger.Info(fmt.Sprintf("Bot run finished with error: %s. Initiating game exit and cooldown.", err.Error()))
+
+				if exitErr := s.bot.ctx.Manager.ExitGame(); exitErr != nil {
+					s.bot.ctx.Logger.Error(fmt.Sprintf("Error trying to exit game: %s", exitErr.Error()))
+					return ErrUnrecoverableClientState
+				}
+
+				s.bot.ctx.Logger.Info("Waiting 5 seconds for game client to close completely...")
+				utils.Sleep(int(5 * time.Second / time.Millisecond)) 
+
+				timeout := time.After(15 * time.Second) 
+				for s.bot.ctx.Manager.InGame() {
+					select {
+					case <-ctx.Done():
+						return nil 
+					case <-timeout:
+						s.bot.ctx.Logger.Error("Timeout waiting for game to report 'not in game' after exit attempt. Forcing client kill.")
+						
+						if killErr := s.KillClient(); killErr != nil {
+							s.bot.ctx.Logger.Error(fmt.Sprintf("Failed to kill client after timeout and InGame() check: %s", killErr.Error()))
+						}
+						
+						return ErrUnrecoverableClientState
+					default:
+						s.bot.ctx.Logger.Debug("Still detected as in game, waiting for RefreshGameData to update...")
+						utils.Sleep(int(500 * time.Millisecond / time.Millisecond)) // Corrected type cast for utils.Sleep
+						s.bot.ctx.RefreshGameData() // Force a refresh if it's not fast enough
+					}
+				}
+				s.bot.ctx.Logger.Info("Game client successfully detected as 'not in game'.")
+
+				// Reset the 'time spent outside game' timer NOW that we've confirmed out of game.
+				timeSpentNotInGameStart = time.Now()
+
+				// Log the game finish event *after* the exit process and delay.
+				var gameFinishReason event.FinishReason
 				switch {
 				case errors.Is(err, health.ErrChicken):
 					gameFinishReason = event.FinishedChicken
@@ -122,14 +200,30 @@ func (s *SinglePlayerSupervisor) Start() error {
 					gameFinishReason = event.FinishedError
 				}
 				event.Send(event.GameFinished(event.WithScreenshot(s.name, err.Error(), s.bot.ctx.GameReader.Screenshot()), gameFinishReason))
+
+				// Log game total time for error cases
 				s.bot.ctx.Logger.Warn(
 					fmt.Sprintf("Game finished with errors, reason: %s. Game total time: %0.2fs", err.Error(), time.Since(gameStart).Seconds()),
 					slog.String("supervisor", s.name),
 					slog.Uint64("mapSeed", uint64(s.bot.ctx.GameReader.MapSeed())),
 				)
-			} else {
-				gameFinishReason = event.FinishedOK
-				event.Send(event.GameFinished(event.Text(s.name, "Game finished successfully"), gameFinishReason))
+
+				continue
+			}
+
+			// This block now only runs if err is nil (successful run completion)
+			gameFinishReason := event.FinishedOK
+			event.Send(event.GameFinished(event.Text(s.name, "Game finished successfully"), gameFinishReason))
+
+			// Log game total time for successful cases
+			s.bot.ctx.Logger.Info(
+				fmt.Sprintf("Game finished successfully. Game total time: %0.2fs", time.Since(gameStart).Seconds()),
+				slog.String("supervisor", s.name),
+				slog.Uint64("mapSeed", uint64(s.bot.ctx.GameReader.MapSeed())),
+			)
+
+			if s.bot.ctx.CharacterCfg.Companion.Enabled && s.bot.ctx.CharacterCfg.Companion.Leader {
+				event.Send(event.ResetCompanionGameInfo(event.Text(s.name, "Game "+s.bot.ctx.Data.Game.LastGameName+" finished"), s.bot.ctx.CharacterCfg.CharacterName))
 			}
 
 			if exitErr := s.bot.ctx.Manager.ExitGame(); exitErr != nil {
@@ -137,153 +231,268 @@ func (s *SinglePlayerSupervisor) Start() error {
 				event.Send(event.GameFinished(event.WithScreenshot(s.name, errMsg, s.bot.ctx.GameReader.Screenshot()), event.FinishedError))
 				return errors.New(errMsg)
 			}
+			s.bot.ctx.Logger.Info("Game finished successfully. Waiting 3 seconds for client to close.")
+			utils.Sleep(int(3 * time.Second / time.Millisecond)) 
+			timeSpentNotInGameStart = time.Now() 
+
+		} 
+	} 
+}
+
+
+// This function is responsible for handling all interactions with joining/creating games
+func (s *SinglePlayerSupervisor) HandleMenuFlow() error {
+
+	s.bot.ctx.RefreshGameData()
+
+	if s.bot.ctx.Data.OpenMenus.LoadingScreen {
+		utils.Sleep(500)
+		return fmt.Errorf("loading screen")
+	}
+
+	s.bot.ctx.Logger.Debug("[Menu Flow]: Starting menu flow ...")
+
+	// Check if we're in character creation screen, and exit
+	if s.bot.ctx.GameReader.IsInCharacterCreationScreen() {
+		s.bot.ctx.Logger.Debug("[Menu Flow]: We're in character creation screen, exiting ...")
+
+		// Click escape to exit character creation screen
+		s.bot.ctx.HID.PressKey(0x1B)
+		time.Sleep(2000)
+
+		// Check if we're still in character creation screen
+		if s.bot.ctx.GameReader.IsInCharacterCreationScreen() {
+			return errors.New("[Menu Flow]: Failed to exit character creation screen")
 		}
+	}
+
+	// Check if we're ingame for some reason but shouldn't?
+	if s.bot.ctx.Manager.InGame() {
+		s.bot.ctx.Logger.Debug("[Menu Flow]: We're still ingame, exiting ...")
+		return s.bot.ctx.Manager.ExitGame()
+	}
+
+	// Check if there's any error popup
+	isDismissableModalPresent, text := s.bot.ctx.GameReader.IsDismissableModalPresent()
+	if isDismissableModalPresent {
+		s.bot.ctx.Logger.Debug("[Menu Flow]: Detected dismissable modal with text: " + text)
+		s.bot.ctx.Logger.Debug("[Menu Flow]: Dismissing it ...")
+
+		// Click escape to dismiss the modal
+		s.bot.ctx.HID.PressKey(0x1B)
+		time.Sleep(1000)
+
+		// Check again if the modal is still there
+		isDismissableModalStillPresent, _ := s.bot.ctx.GameReader.IsDismissableModalPresent()
+		if isDismissableModalStillPresent {
+			s.bot.ctx.Logger.Warn(fmt.Sprintf("[Menu Flow]: Dismissable modal still present after attempt to dismiss: %s", text))
+
+			// Increment counter for persistent modal errors
+			s.bot.ctx.CurrentGame.FailedToCreateGameAttempts++
+			const MAX_MODAL_DISMISS_ATTEMPTS = 3 // Define a reasonable threshold
+
+			if s.bot.ctx.CurrentGame.FailedToCreateGameAttempts >= MAX_MODAL_DISMISS_ATTEMPTS {
+				s.bot.ctx.Logger.Error(fmt.Sprintf("[Menu Flow]: Failed to dismiss modal '%s' %d times. Assuming unrecoverable state.", text, MAX_MODAL_DISMISS_ATTEMPTS))
+				s.bot.ctx.CurrentGame.FailedToCreateGameAttempts = 0 // Reset counter before returning
+				return ErrUnrecoverableClientState                  // Return our new error type
+			}
+
+			return errors.New("[Menu Flow]: Failed to dismiss popup (still present)") // Return a specific error
+		}
+	} else {
+		// If no dismissable modal is present, reset the counter for failed attempts if it's related to modals
+		s.bot.ctx.CurrentGame.FailedToCreateGameAttempts = 0
+	}
+
+	// Check if we'll handle standard or companion mode
+	if s.bot.ctx.CharacterCfg.Companion.Enabled && !s.bot.ctx.CharacterCfg.Companion.Leader {
+		s.bot.ctx.Logger.Debug("[Menu Flow]: Companion mode detected, handling companion menu flow ...")
+		return s.HandleCompanionMenuFlow()
+	} else if s.bot.ctx.CharacterCfg.Companion.Enabled && s.bot.ctx.CharacterCfg.Companion.Leader {
+		s.bot.ctx.Logger.Debug("[Menu Flow]: Companion Leader mode detected, using standard menu flow ...")
+		return s.HandleStandardMenuFlow()
+	} else {
+		s.bot.ctx.Logger.Debug("[Menu Flow]: Standard mode detected, handling standard menu flow ...")
+		return s.HandleStandardMenuFlow()
 	}
 }
 
-// This function is responsible for handling all interactions with joining/creating games
-func (s *SinglePlayerSupervisor) HandleOutOfGameFlow() error {
-	// Refresh the data
-	s.bot.ctx.RefreshGameData()
+func (s *SinglePlayerSupervisor) HandleStandardMenuFlow() error {
 
-	// Catch-all
-	if s.bot.ctx.CharacterCfg.AuthMethod != "None" && s.bot.ctx.GameReader.IsInCharacterSelectionScreen() && !s.bot.ctx.GameReader.IsOnline() {
+	atCharacterSelectionScreen := s.bot.ctx.GameReader.IsInCharacterSelectionScreen()
 
-		// Try and click the online tab to re-connect to bnet
-		s.bot.ctx.HID.Click(game.LeftButton, 1090, 32) // click the online button
+	if atCharacterSelectionScreen && s.bot.ctx.CharacterCfg.AuthMethod != "None" && !s.bot.ctx.CharacterCfg.Game.CreateLobbyGames {
+		s.bot.ctx.Logger.Debug("[Menu Flow]: We're at the character selection screen, ensuring we're online ...")
 
-		// Wait a bit
-		utils.Sleep(4000)
+		err := s.ensureOnline()
+		if err != nil {
+			return err
+		}
 
-		// Check if we're online again, if not, kill the client
-		if !s.bot.ctx.GameReader.IsOnline() {
+		s.bot.ctx.Logger.Debug("[Menu Flow]: We're online, creating new game ...")
 
-			// Kill the client so the crash detector will restart it
-			if err := s.KillClient(); err != nil {
-				return err
-			}
+		// Create the game
+		return s.bot.ctx.Manager.NewGame()
 
-			return fmt.Errorf("we've lost connection to bnet or client glitched. The d2r process will be killed")
+	} else if atCharacterSelectionScreen && s.bot.ctx.CharacterCfg.AuthMethod == "None" {
+
+		s.bot.ctx.Logger.Debug("[Menu Flow]: Creating new game ...")
+		return s.bot.ctx.Manager.NewGame()
+	}
+
+	atLobbyScreen := s.bot.ctx.GameReader.IsInLobby()
+
+	if atLobbyScreen && s.bot.ctx.CharacterCfg.Game.CreateLobbyGames {
+		s.bot.ctx.Logger.Debug("[Menu Flow]: We're at the lobby screen and we should create a lobby game ...")
+
+		// Increment the game counter if its 0
+		if s.bot.ctx.CharacterCfg.Game.PublicGameCounter == 0 {
+			s.bot.ctx.CharacterCfg.Game.PublicGameCounter = 1
+		}
+
+		err := s.createLobbyGame()
+		if err != nil {
+			return err
+		}
+
+	} else if !atLobbyScreen && s.bot.ctx.CharacterCfg.Game.CreateLobbyGames {
+		s.bot.ctx.Logger.Debug("[Menu Flow]: We're not at the lobby screen, trying to enter lobby ...")
+		err := s.tryEnterLobby()
+		if err != nil {
+			return err
+		}
+
+		// Create the lobby game
+		err = s.createLobbyGame()
+		if err != nil {
+			return err
+		}
+	} else if atLobbyScreen && !s.bot.ctx.CharacterCfg.Game.CreateLobbyGames {
+		s.bot.ctx.Logger.Debug("[Menu Flow]: We're at the lobby screen, but we shouldn't be, going back to character selection screen ...")
+
+		// Exit lobby by pressing esc
+		s.bot.ctx.HID.PressKey(0x1B)
+		time.Sleep(2000)
+
+		// Check if we're still in lobby
+		if s.bot.ctx.GameReader.IsInLobby() {
+			return fmt.Errorf("[Menu Flow]: Failed to exit lobby")
+		}
+
+		// If we're at character selection screen, create a new game
+		if s.bot.ctx.GameReader.IsInCharacterSelectionScreen() {
+			return s.bot.ctx.Manager.NewGame()
 		}
 	}
 
-	// We're either in the in the Lobby or Character selection screen. Let's check
+	return fmt.Errorf("[Menu Flow]: Unhandled menu scenario")
+}
+
+func (s *SinglePlayerSupervisor) HandleCompanionMenuFlow() error {
+	s.bot.ctx.Logger.Debug("[Menu Flow]: Trying to enter lobby ...")
+
+	gameName := s.bot.ctx.CharacterCfg.Companion.CompanionGameName
+	gamePassword := s.bot.ctx.CharacterCfg.Companion.CompanionGamePassword
+
+	// If game name is blank, idle in menus
+	if gameName == "" {
+		// We don't have a game name, so we'll idle until we get one
+		utils.Sleep(2000)
+		return fmt.Errorf("idle")
+	}
+
 	if s.bot.ctx.GameReader.IsInCharacterSelectionScreen() {
-		// TODO: Add Joining Games
-
-		if s.bot.ctx.CharacterCfg.Game.CreateLobbyGames {
-			retryCount := 0
-			for !s.bot.ctx.GameReader.IsInLobby() {
-
-				// Prevent an infinite loop
-				if retryCount >= 5 && !s.bot.ctx.GameReader.IsInLobby() {
-					return fmt.Errorf("failed to enter bnet lobby after 5 retries")
-				}
-
-				// Try to enter bnet lobby
-				s.bot.ctx.HID.Click(game.LeftButton, 744, 650)
-				utils.Sleep(1000)
-			}
-
-			if _, err := s.bot.ctx.Manager.CreateOnlineGame(s.bot.ctx.CharacterCfg.Game.PublicGameCounter); err != nil {
-				s.bot.ctx.CharacterCfg.Game.PublicGameCounter++
-				return fmt.Errorf("failed to create an online game")
-
-			} else {
-				// We created the game successfully!
-				s.bot.ctx.CharacterCfg.Game.PublicGameCounter++
-				return nil
-			}
-		} else {
-			// TODO: Add logic to check if we're on the online or offline tab and handle it accordingly.
-			if !s.bot.ctx.GameReader.IsOnline() && s.bot.ctx.CharacterCfg.AuthMethod != "None" {
-
-				// Try and click the online tab to re-connect to bnet
-				s.bot.ctx.HID.Click(game.LeftButton, 1090, 32) // click the online button
-
-				// Wait a bit
-				utils.Sleep(4000)
-
-				// Check again
-				if !s.bot.ctx.GameReader.IsOnline() {
-					// We failed to re-connect. Kill the client so it will get re-started automatically.
-					if err := s.KillClient(); err != nil {
-						return err
-					}
-					return fmt.Errorf("lost connection to bnet, killing client")
-				}
-			}
-
-			// Create the game
-			if err := s.bot.ctx.Manager.NewGame(); err != nil {
-				return fmt.Errorf("failed to create game")
-			}
-
-			return nil
+		// Esnure we're online
+		err := s.ensureOnline()
+		if err != nil {
+			return err
 		}
-	} else if s.bot.ctx.GameReader.IsInLobby() {
-		// TODO: Add Joining Games
 
-		// Check if we are suppose to create lobby games and enter lobby.
-		if s.bot.ctx.CharacterCfg.Game.CreateLobbyGames {
-
-			retryCount := 0
-			for !s.bot.ctx.GameReader.IsInLobby() {
-
-				// Prevent an infinite loop
-				if retryCount >= 5 && !s.bot.ctx.GameReader.IsInLobby() {
-					return fmt.Errorf("failed to enter bnet lobby after 5 retries")
-				}
-
-				// Try to enter bnet lobby
-				s.bot.ctx.HID.Click(game.LeftButton, 744, 650)
-				utils.Sleep(1000)
-			}
-
-			if _, err := s.bot.ctx.Manager.CreateOnlineGame(s.bot.ctx.CharacterCfg.Game.PublicGameCounter); err != nil {
-				s.bot.ctx.CharacterCfg.Game.PublicGameCounter++
-				return fmt.Errorf("failed to create an online game")
-
-			} else {
-				// We created the game successfully!
-				s.bot.ctx.CharacterCfg.Game.PublicGameCounter++
-				return nil
-			}
-		} else {
-			// Press escape to exit the lobby
-			s.bot.ctx.HID.PressKey(0x1B) // ESC - to avoid importing win here as well
-			utils.Sleep(1000)
-
-			for range 5 {
-				if s.bot.ctx.GameReader.IsInCharacterSelectionScreen() && s.bot.ctx.GameReader.IsOnline() {
-					break
-				}
-
-				if s.bot.ctx.GameReader.IsInLobby() {
-					// Mission failed
-					s.bot.ctx.HID.PressKey(0x1B) // ESC - to avoid importing win here as well
-					utils.Sleep(1000)
-				}
-			}
-
-			if !s.bot.ctx.GameReader.IsInCharacterSelectionScreen() {
-				return fmt.Errorf("failed to leave lobby or an unknown case occurred")
-			}
-
-			// Create the game
-			if err := s.bot.ctx.Manager.NewGame(); err != nil {
-				return fmt.Errorf("failed to create game")
-			}
+		// Now we need to enter the lobby
+		err = s.tryEnterLobby()
+		if err != nil {
+			return err
 		}
-	} else if s.bot.ctx.Data.OpenMenus.LoadingScreen {
-		// We're in a loading screen, wait a bit
-		utils.Sleep(250)
-		return fmt.Errorf("loading screen")
-	} else {
-		return fmt.Errorf("")
+
+		return s.bot.ctx.Manager.JoinOnlineGame(gameName, gamePassword)
 	}
 
-	// TODO: Maybe expand this with functionality to create new characters if the currently configured char isn't found? :)
+	if s.bot.ctx.GameReader.IsInLobby() {
+		s.bot.ctx.Logger.Debug("[Menu Flow]: We're in lobby, joining game ...")
+		return s.bot.ctx.Manager.JoinOnlineGame(gameName, gamePassword)
+	}
 
+	return fmt.Errorf("[Menu Flow]: Unhandled Companion menu scenario")
+}
+
+func (s *SinglePlayerSupervisor) tryEnterLobby() error {
+	s.bot.ctx.Logger.Debug("[Menu Flow]: Trying to enter lobby ...")
+
+	if s.bot.ctx.GameReader.IsInLobby() {
+		s.bot.ctx.Logger.Debug("[Menu Flow]: We're already in lobby, exiting ...")
+		return nil
+	}
+
+	retryCount := 0
+	for !s.bot.ctx.GameReader.IsInLobby() {
+		s.bot.ctx.Logger.Info("Entering lobby", slog.String("supervisor", s.name))
+		// Prevent an infinite loop
+		if retryCount >= 5 {
+			return fmt.Errorf("[Menu Flow]: Failed to enter bnet lobby after 5 retries")
+		}
+
+		// Try to enter bnet lobby by clicking the "Play" button
+		s.bot.ctx.HID.Click(game.LeftButton, 744, 650)
+		utils.Sleep(1000)
+		retryCount++
+	}
+
+	return nil
+}
+
+func (s *SinglePlayerSupervisor) createLobbyGame() error {
+	s.bot.ctx.Logger.Debug("[Menu Flow]: Trying to create lobby game ...")
+
+	// Create the online game
+	_, err := s.bot.ctx.Manager.CreateLobbyGame(s.bot.ctx.CharacterCfg.Game.PublicGameCounter)
+	if err != nil {
+		s.bot.ctx.CharacterCfg.Game.PublicGameCounter++
+		// If Manager.CreateLobbyGame returns an error, we treat it as a failed attempt
+		s.bot.ctx.CurrentGame.FailedToCreateGameAttempts++
+		const MAX_GAME_CREATE_ATTEMPTS = 5 // Define a threshold for game creation failures
+
+		if s.bot.ctx.CurrentGame.FailedToCreateGameAttempts >= MAX_GAME_CREATE_ATTEMPTS {
+			s.bot.ctx.Logger.Error(fmt.Sprintf("[Menu Flow]: Failed to create lobby game %d times. Forcing client restart.", MAX_GAME_CREATE_ATTEMPTS))
+			s.bot.ctx.CurrentGame.FailedToCreateGameAttempts = 0 // Reset counter before returning
+			return ErrUnrecoverableClientState                  // Return our new error type
+		}
+		return fmt.Errorf("[Menu Flow]: Failed to create lobby game: %w", err)
+	}
+
+	// check if dismissable modal is present after trying to create game
+	isDismissableModalPresent, text := s.bot.ctx.GameReader.IsDismissableModalPresent()
+	if isDismissableModalPresent {
+		s.bot.ctx.CharacterCfg.Game.PublicGameCounter++
+		s.bot.ctx.Logger.Warn(fmt.Sprintf("[Menu Flow]: Dismissable modal present after game creation attempt: %s", text))
+
+		// Check if this specific modal is the "Failed to create game" one or "unable to join"
+		if strings.Contains(strings.ToLower(text), "failed to create game") || strings.Contains(strings.ToLower(text), "unable to join") {
+			s.bot.ctx.CurrentGame.FailedToCreateGameAttempts++
+			const MAX_GAME_CREATE_ATTEMPTS_MODAL = 3 // A separate threshold for modal errors after creation attempt
+
+			if s.bot.ctx.CurrentGame.FailedToCreateGameAttempts >= MAX_GAME_CREATE_ATTEMPTS_MODAL {
+				s.bot.ctx.Logger.Error(fmt.Sprintf("[Menu Flow]: 'Failed to create game' modal detected %d times. Forcing client restart.", MAX_GAME_CREATE_ATTEMPTS_MODAL))
+				s.bot.ctx.CurrentGame.FailedToCreateGameAttempts = 0 // Reset counter before returning
+				return ErrUnrecoverableClientState                  // Return our new error type
+			}
+		}
+		return fmt.Errorf("[Menu Flow]: Failed to create lobby game: %s", text)
+	}
+
+	s.bot.ctx.Logger.Debug("[Menu Flow]: Lobby game created successfully")
+
+	// Game created successfully
+	s.bot.ctx.CharacterCfg.Game.PublicGameCounter++
+	s.bot.ctx.CurrentGame.FailedToCreateGameAttempts = 0 // Reset counter on successful game creation
 	return nil
 }

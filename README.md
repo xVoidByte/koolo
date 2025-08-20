@@ -78,15 +78,21 @@ There are some considerations to take into account:
 Setting the development environment is pretty straightforward, but the following dependencies are **required** to build the project.
 
 ### Dependencies
-- [Download Go >= 1.23](https://go.dev/dl/)
+- [Download Go >= 1.24.1](https://go.dev/dl/)
 - [Install git](https://gitforwindows.org/)
 
 ### Building from source
-Open the terminal and run the following commands in project root directory:
+
+First, we open the terminal and install [Garble](https://github.com/burrowers/garble) using the following command:
+```shell
+go install mvdan.cc/garble@latest
+```
+
+Next, run the following commands in project root directory:
 ```shell
 git clone https://github.com/hectorgimenez/koolo.git
 cd koolo
-build.bat
+better_build.bat
 ```
 This will produce the "build" directory with the executable file and all the required assets.
 
@@ -94,6 +100,6 @@ This will produce the "build" directory with the executable file and all the req
 In order to fetch latest `main` branch changes run the following commands in project root directory:
 ```shell
 git pull
-build.bat
+better_build.bat
 ```
-**Note**: `build` directory **will be deleted**, so if you customized any file in there, make sure to backup it before running `build.bat`.
+**Note**: If you use `build.bat`, the `build` directory **will be deleted**, so if you customized any file(s) in there, make sure to backup it before running `build.bat`.

@@ -24,6 +24,10 @@ import (
 
 const (
 	maxGoldPerStashTab = 2500000
+
+	// NEW CONSTANTS FOR IMPROVED GOLD STASHING
+	minInventoryGoldForStashAggressiveLeveling = 1000   // Stash if inventory gold exceeds 1k during leveling when total gold is low
+	maxTotalGoldForAggressiveLevelingStash     = 150000 // Trigger aggressive stashing if total gold (inventory + stashed) is below this
 )
 
 func Stash(forceStash bool) error {
@@ -50,11 +54,13 @@ func Stash(forceStash bool) error {
 			return ctx.Data.OpenMenus.Stash
 		},
 	)
-	// Clear messages like TZ change or public game spam.  Prevent bot from clicking on messages
+	// Clear messages like TZ change or public game spam. Prevent bot from clicking on messages
 	ClearMessages()
 	stashGold()
 	orderInventoryPotions()
 	stashInventory(forceStash)
+	// Add call to dropExcessItems after stashing
+	dropExcessItems()
 	step.CloseAllMenus()
 
 	return nil
@@ -82,9 +88,12 @@ func isStashingRequired(firstRun bool) bool {
 	ctx := context.Get()
 	ctx.SetLastStep("isStashingRequired")
 
+	// Check if the character is currently leveling
+	_, isLevelingChar := ctx.Char.(context.LevelingCharacter)
+
 	for _, i := range ctx.Data.Inventory.ByLocation(item.LocationInventory) {
-		stashIt, _, _ := shouldStashIt(i, firstRun)
-		if stashIt {
+		stashIt, dropIt, _, _ := shouldStashIt(i, firstRun)
+		if stashIt || dropIt { // Check for dropIt as well
 			return true
 		}
 	}
@@ -93,10 +102,28 @@ func isStashingRequired(firstRun bool) bool {
 	for _, goldInStash := range ctx.Data.Inventory.StashedGold {
 		if goldInStash < maxGoldPerStashTab {
 			isStashFull = false
+			break // Optimization: No need to check further tabs if one has space
 		}
 	}
 
+	// Calculate total gold (inventory + stashed) for the new aggressive stashing rule
+	totalGold := ctx.Data.Inventory.Gold
+	for _, stashedGold := range ctx.Data.Inventory.StashedGold {
+		totalGold += stashedGold
+	}
+
+	// 1. AGGRESSIVE STASHING for leveling characters with LOW TOTAL GOLD
+	if isLevelingChar && totalGold < maxTotalGoldForAggressiveLevelingStash && ctx.Data.Inventory.Gold >= minInventoryGoldForStashAggressiveLeveling && !isStashFull {
+		ctx.Logger.Debug(fmt.Sprintf("Leveling char with LOW TOTAL GOLD (%.2fk < %.2fk) and INV GOLD (%.2fk) above aggressive threshold (%.2fk). Stashing gold.",
+			float64(totalGold)/1000, float64(maxTotalGoldForAggressiveLevelingStash)/1000,
+			float64(ctx.Data.Inventory.Gold)/1000, float64(minInventoryGoldForStashAggressiveLeveling)/1000))
+		return true
+	}
+
+	// 2. STANDARD STASHING for all other cases (non-leveling, or leveling with sufficient total gold)
 	if ctx.Data.Inventory.Gold > ctx.Data.PlayerUnit.MaxGold()/3 && !isStashFull {
+		ctx.Logger.Debug(fmt.Sprintf("Inventory gold (%.2fk) is above standard threshold (%.2fk). Stashing gold.",
+			float64(ctx.Data.Inventory.Gold)/1000, float64(ctx.Data.PlayerUnit.MaxGold())/3/1000))
 		return true
 	}
 
@@ -116,13 +143,20 @@ func stashGold() {
 	for tab, goldInStash := range ctx.Data.Inventory.StashedGold {
 		ctx.RefreshGameData()
 		if ctx.Data.Inventory.Gold == 0 {
+			ctx.Logger.Info("All inventory gold stashed.") // Added log for clarity
 			return
 		}
 
 		if goldInStash < maxGoldPerStashTab {
-			SwitchStashTab(tab + 1)
+			SwitchStashTab(tab + 1) // Stash tabs are 0-indexed in data, but 1-indexed for UI interaction
 			clickStashGoldBtn()
-			utils.Sleep(500)
+			utils.Sleep(1000) // Increased sleep after first click to ensure dialog appears
+			// After clicking, refresh data again to see if gold is now 0 or less
+			ctx.RefreshGameData() // Crucial: Refresh data to see if gold has been deposited
+			if ctx.Data.Inventory.Gold == 0 { // Check if all gold was stashed in this tab
+				ctx.Logger.Info("All inventory gold stashed.")
+				return
+			}
 		}
 	}
 
@@ -139,8 +173,22 @@ func stashInventory(firstRun bool) {
 	}
 	SwitchStashTab(currentTab)
 
+	// Make a copy of inventory items to avoid issues if the slice changes during iteration
+	// For example, if an item is stashed and the underlying data structure is updated
+	itemsToProcess := make([]data.Item, 0)
 	for _, i := range ctx.Data.Inventory.ByLocation(item.LocationInventory) {
-		stashIt, matchedRule, ruleFile := shouldStashIt(i, firstRun)
+		itemsToProcess = append(itemsToProcess, i)
+	}
+
+	for _, i := range itemsToProcess { // Iterate over the copy
+		stashIt, dropIt, matchedRule, ruleFile := shouldStashIt(i, firstRun)
+
+		if dropIt {
+			ctx.Logger.Info(fmt.Sprintf("Dropping item %s [%s] due to MaxQuantity rule.", i.Desc().Name, i.Quality.ToString()))
+			DropItem(i) // Call the new DropItem function
+			step.CloseAllMenus()
+			continue    // Move to the next item
+		}
 
 		if !stashIt {
 			continue
@@ -148,90 +196,116 @@ func stashInventory(firstRun bool) {
 
 		// Always stash unique charms to the shared stash
 		if (i.Name == "grandcharm" || i.Name == "smallcharm" || i.Name == "largecharm") && i.Quality == item.QualityUnique {
-			currentTab = 2
+			currentTab = 2 // Force shared stash for unique charms
 			SwitchStashTab(currentTab)
 		}
 
-		for currentTab < 5 {
+		itemStashed := false // Flag to track if the current item was stashed
+		// Loop through tabs 1 to 5 trying to stash the item
+		for tabAttempt := 1; tabAttempt <= 5; tabAttempt++ {
+			SwitchStashTab(tabAttempt)
+
 			if stashItemAction(i, matchedRule, ruleFile, firstRun) {
+				itemStashed = true
 				r, res := ctx.CharacterCfg.Runtime.Rules.EvaluateAll(i)
 
 				if res != nip.RuleResultFullMatch && firstRun {
 					ctx.Logger.Info(
 						fmt.Sprintf("Item %s [%s] stashed because it was found in the inventory during the first run.", i.Desc().Name, i.Quality.ToString()),
 					)
-					break
+				} else {
+					ctx.Logger.Info(
+						fmt.Sprintf("Item %s [%s] stashed", i.Desc().Name, i.Quality.ToString()),
+						slog.String("nipFile", fmt.Sprintf("%s:%d", r.Filename, r.LineNumber)),
+						slog.String("rawRule", r.RawLine),
+					)
 				}
+				break // Item stashed, move to the next item in itemsToStash
+			}
+			// If we reach here, the item was not stashed on the current tab
+			ctx.Logger.Debug(fmt.Sprintf("Item %s could not be stashed on tab %d. Trying next.", i.Name, tabAttempt))
+		}
 
-				ctx.Logger.Info(
-					fmt.Sprintf("Item %s [%s] stashed", i.Desc().Name, i.Quality.ToString()),
-					slog.String("nipFile", fmt.Sprintf("%s:%d", r.Filename, r.LineNumber)),
-					slog.String("rawRule", r.RawLine),
-				)
-				break
-			}
-			if currentTab == 5 {
-				ctx.Logger.Info("Stash is full ...")
-				//TODO: Stash is full stop the bot
-			}
-			ctx.Logger.Debug(fmt.Sprintf("Tab %d is full, switching to next one", currentTab))
-			currentTab++
-			SwitchStashTab(currentTab)
+		if !itemStashed {
+			ctx.Logger.Warn(fmt.Sprintf("ERROR: Item %s [%s] could not be stashed into any tab. Stash might be full or item too large.", i.Desc().Name, i.Quality.ToString()))
+			// TODO: Potentially stop the bot or alert the user more critically here
+		}
+
+		// Reset currentTab for the next item to either personal or shared if configured
+		currentTab = 1
+		if ctx.CharacterCfg.Character.StashToShared {
+			currentTab = 2
 		}
 	}
+	step.CloseAllMenus()
 }
 
-func shouldStashIt(i data.Item, firstRun bool) (bool, string, string) {
+// shouldStashIt now returns stashIt, dropIt, matchedRule, ruleFile
+func shouldStashIt(i data.Item, firstRun bool) (bool, bool, string, string) {
 	ctx := context.Get()
 	ctx.SetLastStep("shouldStashIt")
 
-	// Don't stash items in protected slots
+	// Don't stash items in protected slots (highest priority exclusion)
 	if ctx.CharacterCfg.Inventory.InventoryLock[i.Position.Y][i.Position.X] == 0 {
-		return false, "", ""
+		return false, false, "", ""
 	}
 
-	// Don't stash items from quests during leveling process, it makes things easier to track
-	if _, isLevelingChar := ctx.Char.(context.LevelingCharacter); isLevelingChar && i.IsFromQuest() {
-		return false, "", ""
+	// These items should NEVER be stashed, regardless of quest status, pickit rules, or first run.
+	fmt.Printf("DEBUG: Evaluating item '%s' for *absolute* exclusion from stash.\n", i.Name)
+	if i.Name == "horadricstaff" { // This is the simplest way given your logs
+		fmt.Printf("DEBUG: ABSOLUTELY PREVENTING stash for '%s' (Horadric Staff exclusion).\n", i.Name)
+		return false, false, "", "" // Explicitly do NOT stash the Horadric Staff
+	}
+	
+	if i.Name == "tomeoftownportal" || i.Name == "tomeofidentify" || i.Name == "key" || i.Name == "wirtsleg" {
+		fmt.Printf("DEBUG: ABSOLUTELY PREVENTING stash for '%s' (Quest/Special item exclusion).\n", i.Name)
+		return false, false, "", ""
+	}
+	
+	if _, isLevelingChar := ctx.Char.(context.LevelingCharacter); isLevelingChar && i.IsFromQuest() && i.Name != "HoradricCube" || i.Name == "HoradricStaff" {
+		return false, false, "", ""
+	}
+
+	if firstRun {
+		fmt.Printf("DEBUG: Allowing stash for '%s' (first run).\n", i.Name)
+		return true, false, "FirstRun", ""
 	}
 
 	if i.IsRuneword {
-		return true, "Runeword", ""
+		return true, false, "Runeword", ""
 	}
 
 	// Stash items that are part of a recipe which are not covered by the NIP rules
 	if shouldKeepRecipeItem(i) {
-		return true, "Item is part of a enabled recipe", ""
+		return true, false, "Item is part of a enabled recipe", ""
 	}
 
-	// Don't stash the Tomes, keys and WirtsLeg
-	if i.Name == item.TomeOfTownPortal || i.Name == item.TomeOfIdentify || i.Name == item.Key || i.Name == "WirtsLeg" {
-		return false, "", ""
-	}
-
+	// Location/position checks
 	if i.Position.Y >= len(ctx.CharacterCfg.Inventory.InventoryLock) || i.Position.X >= len(ctx.CharacterCfg.Inventory.InventoryLock[0]) {
-		return false, "", ""
+		return false, false, "", ""
 	}
 
 	if i.Location.LocationType == item.LocationInventory && ctx.CharacterCfg.Inventory.InventoryLock[i.Position.Y][i.Position.X] == 0 || i.IsPotion() {
-		return false, "", ""
+		return false, false, "", ""
 	}
 
-	// Let's stash everything during first run, we don't want to sell items from the user
-	if firstRun {
-		return true, "FirstRun", ""
-	}
-
+	// NOW, evaluate pickit rules.
 	rule, res := ctx.CharacterCfg.Runtime.Rules.EvaluateAll(i)
-	if res == nip.RuleResultFullMatch && doesExceedQuantity(rule) {
-		return false, "", ""
+
+	if res == nip.RuleResultFullMatch {
+		if doesExceedQuantity(rule) {
+			// If it matches a rule but exceeds quantity, we want to drop it, not stash.
+			fmt.Printf("DEBUG: Dropping '%s' because MaxQuantity is exceeded.\n", i.Name)
+			return false, true, rule.RawLine, rule.Filename + ":" + strconv.Itoa(rule.LineNumber)
+		} else {
+			// If it matches a rule and quantity is fine, stash it.
+			fmt.Printf("DEBUG: Allowing stash for '%s' (pickit rule match: %s).\n", i.Name, rule.RawLine)
+			return true, false, rule.RawLine, rule.Filename + ":" + strconv.Itoa(rule.LineNumber)
+		}
 	}
 
-	// Full rule match
-	if res == nip.RuleResultFullMatch {
-		return true, rule.RawLine, rule.Filename + ":" + strconv.Itoa(rule.LineNumber)
-	}
-	return false, "", ""
+	fmt.Printf("DEBUG: Disallowing stash for '%s' (no rule match and not explicitly kept, and not exceeding quantity).\n", i.Name)
+	return false, false, "", "" // Default if no other rule matches
 }
 
 func shouldKeepRecipeItem(i data.Item) bool {
@@ -251,6 +325,7 @@ func shouldKeepRecipeItem(i data.Item) bool {
 			_, res := ctx.CharacterCfg.Runtime.Rules.EvaluateAll(it)
 			if res != nip.RuleResultFullMatch {
 				itemInStashNotMatchingRule = true
+				break // Optimization: Found one, no need to check others
 			}
 		}
 	}
@@ -258,7 +333,9 @@ func shouldKeepRecipeItem(i data.Item) bool {
 	recipeMatch := false
 
 	// Check if the item is part of a recipe and if that recipe is enabled
-	for _, recipe := range Recipes {
+	// 'Recipes' variable is expected to be defined/imported from 'cube_recipes.go' or similar.
+	// This function (shouldKeepRecipeItem) itself is external to this file.
+	for _, recipe := range Recipes { // Assuming `Recipes` is properly defined/imported
 		if slices.Contains(recipe.Items, string(i.Name)) && slices.Contains(ctx.CharacterCfg.CubeRecipes.EnabledRecipes, recipe.Name) {
 			recipeMatch = true
 			break
@@ -279,25 +356,27 @@ func stashItemAction(i data.Item, rule string, ruleFile string, skipLogging bool
 	screenPos := ui.GetScreenCoordsForItem(i)
 	ctx.HID.MovePointer(screenPos.X, screenPos.Y)
 	utils.Sleep(170)
-	screenshot := ctx.GameReader.Screenshot()
+	screenshot := ctx.GameReader.Screenshot() // Take screenshot *before* attempting stash
 	utils.Sleep(150)
 	ctx.HID.ClickWithModifier(game.LeftButton, screenPos.X, screenPos.Y, game.CtrlKey)
-	utils.Sleep(500)
+	utils.Sleep(500) // Give game time to process the stash
 
+	// Verify if the item is no longer in inventory
+	ctx.RefreshGameData() // Crucial: Refresh data to see if item moved
 	for _, it := range ctx.Data.Inventory.ByLocation(item.LocationInventory) {
 		if it.UnitID == i.UnitID {
-			return false
+			ctx.Logger.Debug(fmt.Sprintf("Failed to stash item %s (UnitID: %d), still in inventory.", i.Name, i.UnitID))
+			return false // Item is still in inventory, stash failed
 		}
 	}
 
 	dropLocation := "unknown"
 
 	// log the contents of picked up items
-	ctx.Logger.Info(fmt.Sprintf("Picked up items: %v", ctx.CurrentGame.PickedUpItems))
-
+	ctx.Logger.Debug(fmt.Sprintf("Checking PickedUpItems for %s (UnitID: %d)", i.Name, i.UnitID)) // Changed to Debug as this is internal state
 	if _, found := ctx.CurrentGame.PickedUpItems[int(i.UnitID)]; found {
 		areaId := ctx.CurrentGame.PickedUpItems[int(i.UnitID)]
-		dropLocation = area.ID(ctx.CurrentGame.PickedUpItems[int(i.UnitID)]).Area().Name
+		dropLocation = area.ID(areaId).Area().Name // Corrected to use areaId variable
 
 		if slices.Contains(ctx.Data.TerrorZones, area.ID(areaId)) {
 			dropLocation += " (terrorized)"
@@ -309,7 +388,59 @@ func stashItemAction(i data.Item, rule string, ruleFile string, skipLogging bool
 		event.Send(event.ItemStashed(event.WithScreenshot(ctx.Name, fmt.Sprintf("Item %s [%d] stashed", i.Name, i.Quality), screenshot), data.Drop{Item: i, Rule: rule, RuleFile: ruleFile, DropLocation: dropLocation}))
 	}
 
-	return true
+	return true // Item successfully stashed
+}
+
+// dropExcessItems iterates through inventory and drops items marked for dropping
+func dropExcessItems() {
+	ctx := context.Get()
+	ctx.SetLastAction("dropExcessItems")
+
+	itemsToDrop := make([]data.Item, 0)
+	for _, i := range ctx.Data.Inventory.ByLocation(item.LocationInventory) {
+		_, dropIt, _, _ := shouldStashIt(i, false) // Re-evaluate if it should be dropped (not firstRun)
+		if dropIt {
+			itemsToDrop = append(itemsToDrop, i)
+		}
+	}
+
+	if len(itemsToDrop) > 0 {
+		ctx.Logger.Info(fmt.Sprintf("Dropping %d excess items from inventory.", len(itemsToDrop)))
+		// Ensure we are not in a menu before dropping
+		step.CloseAllMenus()
+
+		for _, i := range itemsToDrop {
+			DropItem(i)
+		}
+	}
+}
+
+// DropItem handles moving an item from inventory to the ground
+func DropItem(i data.Item) {
+	ctx := context.Get()
+	ctx.SetLastAction("DropItem")
+	utils.Sleep(170)
+	step.CloseAllMenus()
+	utils.Sleep(170)
+	ctx.HID.PressKeyBinding(ctx.Data.KeyBindings.Inventory)
+	utils.Sleep(170)
+	screenPos := ui.GetScreenCoordsForItem(i)
+	ctx.HID.MovePointer(screenPos.X, screenPos.Y)
+	utils.Sleep(170)
+	ctx.HID.ClickWithModifier(game.LeftButton, screenPos.X, screenPos.Y, game.CtrlKey) // Changed to CtrlKey as per your request
+	utils.Sleep(500)                                                                     // Give game time to process the drop
+	step.CloseAllMenus()
+	utils.Sleep(170)
+	ctx.RefreshGameData() // Refresh to confirm item is gone from inventory
+	for _, it := range ctx.Data.Inventory.ByLocation(item.LocationInventory) {
+		if it.UnitID == i.UnitID {
+			ctx.Logger.Warn(fmt.Sprintf("Failed to drop item %s (UnitID: %d), still in inventory. Inventory might be full or area restricted.", i.Name, i.UnitID))
+			return // Item is still in inventory, drop failed
+		}
+	}
+	ctx.Logger.Debug(fmt.Sprintf("Successfully dropped item %s (UnitID: %d).", i.Name, i.UnitID))
+	
+	step.CloseAllMenus()
 }
 
 func shouldNotifyAboutStashing(i data.Item) bool {
@@ -327,7 +458,9 @@ func shouldNotifyAboutStashing(i data.Item) bool {
 		itemName := strings.ToLower(string(i.Name))
 		for _, runeName := range lowRunes {
 			if itemName == runeName {
+				if !(i.Name == "tirrune" || i.Name == "talrune" || i.Name == "ralrune" || i.Name == "ortrune" || i.Name == "thulrune" || i.Name == "amnrune" || i.Name == "solrune" || i.Name == "lumrune" || i.Name == "nefrune") { // Exclude specific runes from low rune skip logic if they are part of a recipe you want to keep
 				return false
+				}
 			}
 		}
 	}
@@ -372,6 +505,7 @@ func SwitchStashTab(tab int) {
 		ctx.HID.Click(game.LeftButton, x, y)
 		utils.Sleep(500)
 	}
+	
 }
 
 func OpenStash() error {
@@ -397,6 +531,7 @@ func CloseStash() error {
 
 	if ctx.Data.OpenMenus.Stash {
 		ctx.HID.PressKey(win.VK_ESCAPE)
+
 	} else {
 		return errors.New("stash is not open")
 	}
@@ -408,7 +543,7 @@ func TakeItemsFromStash(stashedItems []data.Item) error {
 	ctx := context.Get()
 	ctx.SetLastAction("TakeItemsFromStash")
 
-	if ctx.Data.OpenMenus.Stash {
+	if !ctx.Data.OpenMenus.Stash {
 		err := OpenStash()
 		if err != nil {
 			return err

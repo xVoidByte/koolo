@@ -39,7 +39,7 @@
                         <option value="sorceress" {{ if eq .Config.Character.Class
                         "sorceress" }}selected{{ end }}>Blizzard Sorceress
                         </option>
-                        <option value="nova" {{ if eq .Config.Character.Class
+						<option value="nova" {{ if eq .Config.Character.Class
                         "nova" }}selected{{ end }}>Nova Sorceress
                         </option>
                         <option value="hydraorb" {{ if eq .Config.Character.Class
@@ -147,7 +147,7 @@
 
             <fieldset class="grid">
                 <label>
-                    <input type="checkbox" name="characterUseTeleport" {{ if .Config.Character.UseTeleport }}checked{{ end }}/>
+                    <input type="checkbox" id="characterUseTeleport" name="characterUseTeleport" {{ if .Config.Character.UseTeleport }}checked{{ end }}/>
                     Use teleport when available
                 </label>
                 <label>
@@ -163,6 +163,28 @@
                 <label>
                     <input type="checkbox" name="useCainIdentify" {{ if .Config.Game.UseCainIdentify }}checked{{ end }}/>
                     Identify with Cain
+                </label>
+            </fieldset>
+            <fieldset class="grid">
+                <label>
+            <div id="clearPathDistContainer" class="conditional-field" {{ if .Config.Character.UseTeleport }}style="display: none;"{{ end }}>
+                <div class="walking-radius-container">
+                    <label for="clearPathDist">Clear Path Radius</label>
+                    <div class="walking-radius-slider">
+                        <input
+                                type="range"
+                                id="clearPathDist"
+                                name="clearPathDist"
+                                min="0"
+                                max="30"
+                                step="1"
+                                value="{{ if .Config.Character.ClearPathDist }}{{ .Config.Character.ClearPathDist }}{{ else }}12{{ end }}"
+                        >
+                        <span class="walking-radius-value" id="clearPathDistValue">{{ if .Config.Character.ClearPathDist }}{{ .Config.Character.ClearPathDist }}{{ else }}12{{ end }}</span>
+                    </div>
+                    <div class="input-info">Distance (in game units) to clear enemies while walking through areas</div>
+                </div>
+            </div>
                 </label>
             </fieldset>
             <label>
@@ -391,6 +413,22 @@
                            value="{{ .Config.MaxGameLength }}"/>
                 </label>
             </fieldset>
+            <h3>Companion System</h3><br>
+            <p>The companion system allows you to have your characters play together in a group. If you enable this and don't set it as Leader, it will be a follower. In that case, make sure to specify a Leader Name.</p>
+            <br>
+            <label>
+                <input type="checkbox" name="companionEnabled" id="companionEnabled" {{ if .Config.Companion.Enabled }}checked{{ end }}/>
+                Enabled
+            </label>
+            <label>
+                <input type="checkbox" name="companionLeader" id="companionLeader" {{ if .Config.Companion.Leader }}checked{{ end }}/>
+                Set as Leader
+            </label>
+            <label>
+            Leader Name
+            <input name="companionLeaderName" placeholder="{{ .Config.Companion.LeaderName }}"
+                   value="{{ .Config.Companion.LeaderName }}"/>
+            </label>
             <h4>Run Settings</h4><br>
             <label>
                 Choose the runs that you want the bot to run. You can either drag & drop runs below to enable or disable them, or use the + - buttons. Click on any of the runs to expand them and see more details and options.
@@ -462,16 +500,6 @@
                     </label>
                 {{ end }}
             </div>
-            <h3>Leader mode</h3>
-            <label>
-                <input type="checkbox" name="companionLeader" {{ if .Config.Companion.Leader }}checked{{ end }}/>
-                Leader
-            </label>
-            <label>
-                Leader Name
-                <input name="companionLeaderName" placeholder="{{ .Config.Companion.LeaderName }}"
-                       value="{{ .Config.Companion.LeaderName }}"/>
-            </label>
             <h3>Back to Town Settings:</h3>
             <fieldset class="grid">
                 <label>

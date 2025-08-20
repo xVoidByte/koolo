@@ -4,16 +4,18 @@ import (
 	"log/slog"
 
 	"github.com/hectorgimenez/koolo/internal/action/step"
-	"github.com/hectorgimenez/koolo/internal/context"
+	botCtx "github.com/hectorgimenez/koolo/internal/context" 
 	"github.com/hectorgimenez/koolo/internal/town"
 	"github.com/lxn/win"
 
+
 	"github.com/hectorgimenez/d2go/pkg/data/item"
+	"github.com/hectorgimenez/d2go/pkg/data/stat"
 	"github.com/hectorgimenez/d2go/pkg/data/npc"
 )
 
 func VendorRefill(forceRefill, sellJunk bool) error {
-	ctx := context.Get()
+	ctx := botCtx.Get()
 	ctx.SetLastAction("VendorRefill")
 
 	if !forceRefill && !shouldVisitVendor() {
@@ -41,19 +43,18 @@ func VendorRefill(forceRefill, sellJunk bool) error {
 		ctx.HID.KeySequence(win.VK_HOME, win.VK_DOWN, win.VK_RETURN)
 	}
 
-	SwitchStashTab(4)
-	ctx.RefreshGameData()
-	town.BuyConsumables(forceRefill)
-
 	if sellJunk {
 		town.SellJunk()
 	}
+	SwitchStashTab(4)
+	ctx.RefreshGameData()
+	town.BuyConsumables(forceRefill)
 
 	return step.CloseAllMenus()
 }
 
 func BuyAtVendor(vendor npc.ID, items ...VendorItemRequest) error {
-	ctx := context.Get()
+	ctx := botCtx.Get()
 	ctx.SetLastAction("BuyAtVendor")
 
 	err := InteractNPC(vendor)
@@ -84,23 +85,47 @@ func BuyAtVendor(vendor npc.ID, items ...VendorItemRequest) error {
 type VendorItemRequest struct {
 	Item     item.Name
 	Quantity int
-	Tab      int // At this point I have no idea how to detect the Tab the Item is in the vendor (1-4)
+	Tab      int 
 }
 
 func shouldVisitVendor() bool {
-	ctx := context.Get()
+	ctx := botCtx.Get() // ctx is of type *botCtx.Status
 	ctx.SetLastStep("shouldVisitVendor")
 
 	// Check if we should sell junk
 	if len(town.ItemsToBeSold()) > 0 {
+		// Pass the embedded Context field: ctx.Context
+		if !hasTownPortalsInInventory(ctx.Context) { // <--- Renamed function call
+			ctx.Logger.Debug("Skipping vendor visit (sell junk): No Town Portals available to get to town.")
+			return false
+		}
 		return true
 	}
 
-	// Skip the vendor if we don't have enough gold to do anything... this is not the optimal scenario,
-	// but I have no idea how to check vendor Item prices.
 	if ctx.Data.PlayerUnit.TotalPlayerGold() < 1000 {
 		return false
 	}
 
-	return ctx.BeltManager.ShouldBuyPotions() || town.ShouldBuyTPs() || town.ShouldBuyIDs()
+	if ctx.BeltManager.ShouldBuyPotions() || town.ShouldBuyTPs() || town.ShouldBuyIDs() {
+		// Pass the embedded Context field: ctx.Context
+		if !hasTownPortalsInInventory(ctx.Context) { 
+			ctx.Logger.Debug("Skipping vendor visit (buy consumables): No Town Portals available to get to town.")
+			return false
+		}
+		return true
+	}
+
+	return false
+}
+
+
+func hasTownPortalsInInventory(ctx *botCtx.Context) bool { // <--- Renamed function definition
+	portalTome, found := ctx.Data.Inventory.Find(item.TomeOfTownPortal, item.LocationInventory)
+	if !found {
+		return false // No portal tome found, so no TPs, can't go to town.
+	}
+
+	qty, found := portalTome.FindStat(stat.Quantity, 0)
+	// If quantity stat isn't found, or if quantity is exactly 0, then we can't make a TP.
+	return qty.Value > 0 && found
 }

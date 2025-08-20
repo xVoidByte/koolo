@@ -3,44 +3,91 @@ package action
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/hectorgimenez/d2go/pkg/data"
+	"github.com/hectorgimenez/d2go/pkg/data/object"
 	"github.com/hectorgimenez/d2go/pkg/data/stat"
 	"github.com/hectorgimenez/koolo/internal/context"
 	"github.com/hectorgimenez/koolo/internal/game"
 	"github.com/hectorgimenez/koolo/internal/utils"
 )
 
+// interactableShrines is a list of shrine types that the bot should interact with.
+var interactableShrines = []object.ShrineType{
+	object.ExperienceShrine,
+	object.StaminaShrine,
+	object.ManaRegenShrine,
+	object.SkillShrine,
+	object.RefillShrine,
+	object.HealthShrine,
+	object.ManaShrine,
+}
+
 func ClearCurrentLevel(openChests bool, filter data.MonsterFilter) error {
 	ctx := context.Get()
 	ctx.SetLastAction("ClearCurrentLevel")
 
+	// We can make this configurable later, but 20 is a good starting radius.
+	const pickupRadius = 20
+
 	rooms := ctx.PathFinder.OptimizeRoomsTraverseOrder()
 	for _, r := range rooms {
+		// First, clear the room of monsters
 		err := clearRoom(r, filter)
 		if err != nil {
 			ctx.Logger.Warn("Failed to clear room: %v", err)
 		}
 
-		if !openChests {
-			continue
+		ctx.Logger.Debug(fmt.Sprintf("Clearing room complete, attempting to pickup items in a radius of %d", pickupRadius))
+		err = ItemPickup(pickupRadius)
+		if err != nil {
+			ctx.Logger.Warn("Failed to pickup items", slog.Any("error", err))
 		}
 
+		// Iterate through objects in the current room
 		for _, o := range ctx.Data.Objects {
-			if o.IsChest() && o.Selectable && r.IsInside(o.Position) {
-				err = MoveToCoords(o.Position)
-				if err != nil {
-					ctx.Logger.Warn("Failed moving to chest: %v", err)
-					continue
+			if r.IsInside(o.Position) {
+				// Interact with chests if openChests is true
+				if openChests && o.IsChest() && o.Selectable {
+					ctx.Logger.Debug(fmt.Sprintf("Found chest. attempting to interact. Name=%s. ID=%v UnitID=%v Pos=%v,%v Area='%s' InteractType=%v", o.Desc().Name, o.Name, o.ID, o.Position.X, o.Position.Y, ctx.Data.PlayerUnit.Area.Area().Name, o.InteractType))
+					err = MoveToCoords(o.Position)
+					if err != nil {
+						ctx.Logger.Warn("Failed moving to chest", slog.Any("error", err))
+						continue
+					}
+					err = InteractObject(o, func() bool {
+						chest, _ := ctx.Data.Objects.FindByID(o.ID)
+						return !chest.Selectable
+					})
+					if err != nil {
+						ctx.Logger.Warn("Failed interacting with chest", slog.Any("error", err))
+					}
+					utils.Sleep(500) // Add small delay to allow the game to open the chest and drop the content
 				}
-				err = InteractObject(o, func() bool {
-					chest, _ := ctx.Data.Objects.FindByID(o.ID)
-					return !chest.Selectable
-				})
-				if err != nil {
-					ctx.Logger.Warn("Failed interacting with chest: %v", err)
+
+				// Interact with desired shrine types
+				if o.IsShrine() && o.Selectable {
+					for _, shrineType := range interactableShrines {
+						if o.Shrine.ShrineType == shrineType {
+							ctx.Logger.Debug(fmt.Sprintf("Found %s shrine. attempting to interact. Name=%s. ID=%v UnitID=%v Pos=%v,%v Area='%s' InteractType=%v", o.Desc().Name, o.Desc().Name, o.ID, o.Position.X, o.Position.Y, ctx.Data.PlayerUnit.Area.Area().Name, o.InteractType))
+							err = MoveToCoords(o.Position)
+							if err != nil {
+								ctx.Logger.Warn("Failed moving to shrine", slog.Any("error", err))
+								continue
+							}
+							err = InteractObject(o, func() bool {
+								shrine, _ := ctx.Data.Objects.FindByID(o.ID)
+								return !shrine.Selectable
+							})
+							if err != nil {
+								ctx.Logger.Warn("Failed interacting with shrine", slog.Any("error", err))
+							}
+							utils.Sleep(500)
+							break 
+						}
+					}
 				}
-				utils.Sleep(500) // Add small delay to allow the game to open the chest and drop the content
 			}
 		}
 	}

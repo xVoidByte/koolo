@@ -1,28 +1,43 @@
+// internal/action/move.go
 package action
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"sort"
 	"time"
 
-	"github.com/hectorgimenez/koolo/internal/pather"
+	"github.com/hectorgimenez/d2go/pkg/data/stat"
 	"github.com/hectorgimenez/koolo/internal/utils"
 
 	"github.com/hectorgimenez/d2go/pkg/data"
 	"github.com/hectorgimenez/d2go/pkg/data/area"
+	"github.com/hectorgimenez/d2go/pkg/data/item"
 	"github.com/hectorgimenez/d2go/pkg/data/object"
-	"github.com/hectorgimenez/d2go/pkg/data/stat"
 	"github.com/hectorgimenez/koolo/internal/action/step"
 	"github.com/hectorgimenez/koolo/internal/context"
 	"github.com/hectorgimenez/koolo/internal/event"
 	"github.com/hectorgimenez/koolo/internal/game"
+	"github.com/hectorgimenez/koolo/internal/health"
 )
 
 const (
-	maxAreaSyncAttempts = 10
-	areaSyncDelay       = 100 * time.Millisecond
+	maxAreaSyncAttempts   = 10
+	areaSyncDelay         = 100 * time.Millisecond
+	monsterHandleCooldown = 500 * time.Millisecond // Reduced cooldown for more immediate re-engagement
+	lootAfterCombatRadius = 25                     // Define a radius for looting after combat
 )
+
+var actionLastMonsterHandlingTime = time.Time{}
+
+// checkPlayerDeath checks if the player is dead and returns ErrDied if so.
+func checkPlayerDeath(ctx *context.Status) error {
+	if ctx.Data.PlayerUnit.HPPercent() <= 0 {
+		return health.ErrDied
+	}
+	return nil
+}
 
 func ensureAreaSync(ctx *context.Status, expectedArea area.ID) error {
 	// Skip sync check if we're already in the expected area and have valid area data
@@ -33,6 +48,11 @@ func ensureAreaSync(ctx *context.Status, expectedArea area.ID) error {
 	// Wait for area data to sync
 	for attempts := 0; attempts < maxAreaSyncAttempts; attempts++ {
 		ctx.RefreshGameData()
+
+		// Check for death during area sync
+		if err := checkPlayerDeath(ctx); err != nil {
+			return err
+		}
 
 		if ctx.Data.PlayerUnit.Area == expectedArea {
 			return nil
@@ -48,11 +68,17 @@ func MoveToArea(dst area.ID) error {
 	ctx := context.Get()
 	ctx.SetLastAction("MoveToArea")
 
+	// Proactive death check at the start of the action
+	if err := checkPlayerDeath(ctx); err != nil {
+		return err
+	}
+
 	if err := ensureAreaSync(ctx, ctx.Data.PlayerUnit.Area); err != nil {
 		return err
 	}
 
-	// Exception for Arcane Sanctuary
+	// Exceptions for:
+	// Arcane Sanctuary
 	if dst == area.ArcaneSanctuary && ctx.Data.PlayerUnit.Area == area.PalaceCellarLevel3 {
 		ctx.Logger.Debug("Arcane Sanctuary detected, finding the Portal")
 		portal, _ := ctx.Data.Objects.FindOne(object.ArcaneSanctuaryPortal)
@@ -60,6 +86,25 @@ func MoveToArea(dst area.ID) error {
 
 		return step.InteractObject(portal, func() bool {
 			return ctx.Data.PlayerUnit.Area == area.ArcaneSanctuary
+		})
+	}
+	// Canyon of the Magi
+	if dst == area.CanyonOfTheMagi && ctx.Data.PlayerUnit.Area == area.ArcaneSanctuary {
+		ctx.Logger.Debug("Canyon of the Magi detected, finding the Portal")
+		tome, _ := ctx.Data.Objects.FindOne(object.YetAnotherTome)
+		MoveToCoords(tome.Position)
+		InteractObject(tome, func() bool {
+			if _, found := ctx.Data.Objects.FindOne(object.PermanentTownPortal); found {
+				ctx.Logger.Debug("Opening YetAnotherTome!")
+				return true
+			}
+			return false
+		})
+		ctx.Logger.Debug("Using Canyon of the Magi Portal")
+		portal, _ := ctx.Data.Objects.FindOne(object.PermanentTownPortal)
+		MoveToCoords(portal.Position)
+		return step.InteractObject(portal, func() bool {
+			return ctx.Data.PlayerUnit.Area == area.CanyonOfTheMagi
 		})
 	}
 
@@ -76,6 +121,11 @@ func MoveToArea(dst area.ID) error {
 	}
 
 	toFun := func() (data.Position, bool) {
+		// Check for death during movement target evaluation
+		if err := checkPlayerDeath(ctx); err != nil {
+			return data.Position{}, false // Signal to stop moving if dead
+		}
+
 		if ctx.Data.PlayerUnit.Area == dst {
 			ctx.Logger.Debug("Reached area", slog.String("area", dst.Area().Name))
 			return data.Position{}, false
@@ -127,6 +177,9 @@ func MoveToArea(dst area.ID) error {
 
 	err := MoveTo(toFun)
 	if err != nil {
+		if errors.Is(err, health.ErrDied) { // Propagate death error
+			return err
+		}
 		ctx.Logger.Warn("error moving to area, will try to continue", slog.String("error", err.Error()))
 	}
 
@@ -147,6 +200,11 @@ func MoveToArea(dst area.ID) error {
 				)
 				ctx.HID.Click(game.LeftButton, screenX, screenY)
 				utils.Sleep(800)
+			}
+
+			// Proactive death check before interacting with entrance
+			if err := checkPlayerDeath(ctx); err != nil {
+				return err
 			}
 
 			// Try to interact with the entrance
@@ -180,6 +238,11 @@ func MoveToArea(dst area.ID) error {
 func MoveToCoords(to data.Position) error {
 	ctx := context.Get()
 
+	// Proactive death check at the start of the action
+	if err := checkPlayerDeath(ctx); err != nil {
+		return err
+	}
+
 	if err := ensureAreaSync(ctx, ctx.Data.PlayerUnit.Area); err != nil {
 		return err
 	}
@@ -193,6 +256,11 @@ func MoveTo(toFunc func() (data.Position, bool)) error {
 	ctx := context.Get()
 	ctx.SetLastAction("MoveTo")
 
+	// Proactive death check at the start of the action
+	if err := checkPlayerDeath(ctx); err != nil {
+		return err
+	}
+
 	// Ensure no menus are open that might block movement
 	for ctx.Data.OpenMenus.IsMenuOpen() {
 		ctx.Logger.Debug("Found open menus while moving, closing them...")
@@ -203,9 +271,8 @@ func MoveTo(toFunc func() (data.Position, bool)) error {
 		utils.Sleep(500)
 	}
 
-	openedDoors := make(map[object.Name]data.Position)
-	previousIterationPosition := data.Position{}
 	lastMovement := false
+	clearPathDist := ctx.CharacterCfg.Character.ClearPathDist // Get this once
 
 	// Initial sync check
 	if err := ensureAreaSync(ctx, ctx.Data.PlayerUnit.Area); err != nil {
@@ -214,122 +281,186 @@ func MoveTo(toFunc func() (data.Position, bool)) error {
 
 	for {
 		ctx.RefreshGameData()
+		// Check for death after refreshing game data in the loop
+		if err := checkPlayerDeath(ctx); err != nil {
+			return err
+		}
+
 		to, found := toFunc()
 		if !found {
+			// This covers the case where toFunc itself might return false due to death
 			return nil
 		}
 
-		// If we can teleport, don't bother with the rest
+		// If we can teleport.
 		if ctx.Data.CanTeleport() {
-			return step.MoveTo(to)
-		}
-
-		// Check for doors blocking path
-		for _, o := range ctx.Data.Objects {
-			if o.IsDoor() && ctx.PathFinder.DistanceFromMe(o.Position) < 10 && openedDoors[o.Name] != o.Position {
-				if o.Selectable {
-					ctx.Logger.Info("Door detected and teleport is not available, trying to open it...")
-					openedDoors[o.Name] = o.Position
-					err := step.InteractObject(o, func() bool {
-						obj, found := ctx.Data.Objects.FindByID(o.ID)
-						return found && !obj.Selectable
-					})
-					if err != nil {
-						return err
+			moveErr := step.MoveTo(to)
+			if moveErr != nil {
+				if errors.Is(moveErr, step.ErrMonstersInPath) {
+					ctx.Logger.Debug("Teleporting character encountered monsters in path. Engaging.")
+					if time.Since(actionLastMonsterHandlingTime) > monsterHandleCooldown {
+						actionLastMonsterHandlingTime = time.Now()
+						_ = ClearAreaAroundPosition(ctx.Data.PlayerUnit.Position, clearPathDist, data.MonsterAnyFilter())
+						// After clearing, immediately try to pick up items
+						lootErr := PickItems(lootAfterCombatRadius)
+						if lootErr != nil {
+							ctx.Logger.Warn("Error picking up items after combat (teleporter)", slog.String("error", lootErr.Error()))
+						}
 					}
+					continue
 				}
+				return moveErr
 			}
+			return nil // Teleport move successful
 		}
-		// Check if there is any object blocking our path
-		for _, o := range ctx.Data.Objects {
-			if o.Name == object.Barrel && ctx.PathFinder.DistanceFromMe(o.Position) < 3 {
-				err := step.InteractObject(o, func() bool {
-					obj, found := ctx.Data.Objects.FindByID(o.ID)
-					//additional click on barrel to avoid getting stuck
-					x, y := ctx.PathFinder.GameCoordsToScreenCords(o.Position.X, o.Position.Y)
-					ctx.HID.Click(game.LeftButton, x, y)
-					return found && !obj.Selectable
-				})
-				if err != nil {
-					return err
-				}
+
+		// *** CORE LOGIC FOR 100% ENGAGEMENT / SAFE ZONE FOR NON-TELEPORTING CHARACTERS ***
+		// Always check for enemies within clearPathDist before ANY movement attempt for non-teleporters.
+		monstersInRange := false
+		for _, m := range ctx.Data.Monsters.Enemies(data.MonsterAnyFilter()) {
+			if m.Stats[stat.Life] > 0 && ctx.PathFinder.DistanceFromMe(m.Position) <= clearPathDist {
+				monstersInRange = true
+				break
 			}
 		}
 
-		// Check for monsters close to player
-		closestMonster := data.Monster{}
-		closestMonsterDistance := 9999999
-		targetedNormalEnemies := make([]data.Monster, 0)
-		targetedElites := make([]data.Monster, 0)
-		minDistance := 6
-		minDistanceForElites := 20                                            // This will make the character to kill elites even if they are far away, ONLY during leveling
-		stuck := ctx.PathFinder.DistanceFromMe(previousIterationPosition) < 5 // Detect if character was not able to move from last iteration
-
-		for _, m := range ctx.Data.Monsters.Enemies() {
-			// Skip if monster is already dead
-			if m.Stats[stat.Life] <= 0 {
+		if monstersInRange {
+			ctx.Logger.Debug("Monsters detected within safe zone for non-teleporter. Engaging enemies before attempting movement.")
+			// Only engage if cooldown allows to prevent spamming
+			if time.Since(actionLastMonsterHandlingTime) > monsterHandleCooldown {
+				actionLastMonsterHandlingTime = time.Now()
+				// Call ClearAreaAroundPosition to engage and clear monsters
+				clearErr := ClearAreaAroundPosition(ctx.Data.PlayerUnit.Position, clearPathDist, data.MonsterAnyFilter())
+				if clearErr != nil {
+					ctx.Logger.Warn("Failed to clear all monsters during safe zone check. Will retry movement.",
+						slog.String("error", fmt.Sprintf("%v", clearErr)))
+				}
+				// After engaging, try to pick up items
+				lootErr := PickItems(lootAfterCombatRadius)
+				if lootErr != nil {
+					ctx.Logger.Warn("Error picking up items after combat", slog.String("error", lootErr.Error()))
+				}
+				// After attempting to clear AND loot, continue the main movement loop to re-evaluate.
+				continue
+			} else {
+				// If monsters are in range but cooldown is active, we just wait a bit and re-check
+				utils.Sleep(50) // Small pause to prevent tight loops without action
 				continue
 			}
-
-			dist := ctx.PathFinder.DistanceFromMe(m.Position)
-			appended := false
-			if m.IsElite() && dist <= minDistanceForElites {
-				targetedElites = append(targetedElites, m)
-				appended = true
-			}
-
-			if dist <= minDistance {
-				targetedNormalEnemies = append(targetedNormalEnemies, m)
-				appended = true
-			}
-
-			if appended && dist < closestMonsterDistance {
-				closestMonsterDistance = dist
-				closestMonster = m
-			}
 		}
 
-		if len(targetedNormalEnemies) > 5 || len(targetedElites) > 0 || (stuck && (len(targetedNormalEnemies) > 0 || len(targetedElites) > 0)) || (pather.IsNarrowMap(ctx.Data.PlayerUnit.Area) && (len(targetedNormalEnemies) > 0 || len(targetedElites) > 0)) {
-			if stuck {
-				ctx.Logger.Info("Character stuck and monsters detected, trying to kill monsters around")
-			} else {
-				ctx.Logger.Info(fmt.Sprintf("At least %d monsters detected close to the character, targeting closest one: %d", len(targetedNormalEnemies)+len(targetedElites), closestMonster.Name))
-			}
-
-			path, _, mPathFound := ctx.PathFinder.GetPath(closestMonster.Position)
-			if mPathFound {
-				doorIsBlocking := false
-				for _, o := range ctx.Data.Objects {
-					if o.IsDoor() && o.Selectable && path.Intersects(*ctx.Data, o.Position, 4) {
-						ctx.Logger.Debug("Door is blocking the path to the monster, skipping attack sequence")
-						doorIsBlocking = true
-					}
-				}
-
-				if !doorIsBlocking {
-					ctx.Char.KillMonsterSequence(func(d game.Data) (data.UnitID, bool) {
-						return closestMonster.UnitID, true
-					}, nil)
-				}
-			}
-		}
-
-		// Continue moving
-		WaitForAllMembersWhenLeveling()
-		previousIterationPosition = ctx.Data.PlayerUnit.Position
-
+		// If we reach here, it means no immediate monsters are in the clearPathDist, so we can try to move.
 		if lastMovement {
 			return nil
 		}
 
-		// TODO: refactor this to use the same approach as ClearThroughPath
+		// Check if we are very close to the destination before trying to move
 		if _, distance, _ := ctx.PathFinder.GetPathFrom(ctx.Data.PlayerUnit.Position, to); distance <= step.DistanceToFinishMoving {
 			lastMovement = true
 		}
 
-		err := step.MoveTo(to)
-		if err != nil {
-			return err
+		moveErr := step.MoveTo(to)
+		if moveErr != nil {
+			// This part is now more of a fallback/additional check,
+			// as the proactive check above should catch most cases for non-teleporters.
+			if errors.Is(moveErr, step.ErrMonstersInPath) {
+				ctx.Logger.Debug("Monsters still detected by pathfinding after safe zone check. Re-engaging for non-teleporter.")
+				if time.Since(actionLastMonsterHandlingTime) > monsterHandleCooldown {
+					actionLastMonsterHandlingTime = time.Now()
+					_ = ClearAreaAroundPosition(ctx.Data.PlayerUnit.Position, clearPathDist, data.MonsterAnyFilter())
+					// After fallback engagement, pick up items
+					lootErr := PickItems(lootAfterCombatRadius)
+					if lootErr != nil {
+						ctx.Logger.Warn("Error picking up items after fallback combat", slog.String("error", lootErr.Error()))
+					}
+				}
+				continue // Re-evaluate after combat
+			}
+			return moveErr
+		}
+
+		if lastMovement {
+			return nil
 		}
 	}
+}
+
+// PickItems handles finding and attempting to pick up items within a given radius.
+// This function acts as a wrapper to find eligible items and then calls step.PickupItem for each.
+func PickItems(radius int) error {
+	ctx := context.Get()
+	ctx.Logger.Debug("Action: Checking for items to pick up.")
+
+	foundAndAttemptedPickup := false
+
+	// Filter items that are actually interesting to pick up based on your character config
+	pickableItems := make([]data.Item, 0)
+	for _, it := range ctx.Data.Inventory.ByLocation(item.LocationGround) {
+		if ctx.PathFinder.DistanceFromMe(it.Position) <= radius {
+			// Use your character's pickup filter here.
+			// IMPORTANT: Replace 'true' with your actual item filtering logic, e.g., ctx.CharacterCfg.ShouldPickupItem(it)
+			// For demonstration, assuming all items in range are pickable.
+			if true {
+				pickableItems = append(pickableItems, it)
+			}
+		}
+	}
+
+	// Sort items by distance to pick up closer ones first
+	sort.Slice(pickableItems, func(i, j int) bool {
+		distI := ctx.PathFinder.DistanceFromMe(pickableItems[i].Position)
+		distJ := ctx.PathFinder.DistanceFromMe(pickableItems[j].Position)
+		return distI < distJ
+	})
+
+	for _, it := range pickableItems {
+		ctx.Logger.Debug("Attempting to pick up item", slog.String("item", it.Desc().Name), slog.Any("position", it.Position))
+
+		// Move to the item's position if it's too far for step.PickupItem's internal range check (usually 7 units)
+		// We'll move if distance is > 5 to give some buffer, as step.PickupItem has its own internal 7 unit check.
+		distanceToItem := ctx.PathFinder.DistanceFromMe(it.Position)
+		if distanceToItem > 5 {
+			if err := step.MoveTo(it.Position); err != nil {
+				ctx.Logger.Warn("Failed to move close to item, skipping item", slog.String("item", it.Desc().Name), slog.String("error", err.Error()))
+				// Check for death after failed move to item
+				if errors.Is(err, health.ErrDied) {
+					return err
+				}
+				continue
+			}
+			ctx.RefreshGameData() // Refresh data after moving to check if item is still there / player position is updated
+			// Re-check distance after moving, if still too far, something is wrong
+			if ctx.PathFinder.DistanceFromMe(it.Position) > 7 {
+				ctx.Logger.Warn("Still too far from item after moving, skipping", slog.String("item", it.Desc().Name))
+				continue
+			}
+		}
+
+		// Call the actual step.PickupItem function from the step package
+		// itemPickupAttempt is usually 0 for the first attempt, or can be managed
+		// to try different spiral patterns if it fails. For simplicity here, we use 0.
+		err := step.PickupItem(it, 0) // Pass the full data.Item and initial attempt (0)
+		if err != nil {
+			ctx.Logger.Warn("Failed to pick up item via step.PickupItem", slog.String("item", it.Desc().Name), slog.String("error", err.Error()))
+			// Specifically handle ErrMonsterAroundItem if you want to re-engage
+			if errors.Is(err, step.ErrMonsterAroundItem) {
+				ctx.Logger.Debug("Monsters appeared during item pickup, will re-engage combat.")
+				return err // Propagate this error up to MoveTo to trigger combat
+			}
+			// Check for death after failed pickup
+			if errors.Is(err, health.ErrDied) {
+				return err
+			}
+			continue // Skip this item, try next
+		}
+		foundAndAttemptedPickup = true
+		utils.Sleep(200) // Small delay after successful pickup
+
+		ctx.RefreshGameData() // Refresh data to confirm item is gone
+	}
+
+	if !foundAndAttemptedPickup {
+		ctx.Logger.Debug("No eligible items found or successfully picked up in range.")
+	}
+	return nil // Return nil on completion, even if some items failed (unless ErrMonsterAroundItem)
 }

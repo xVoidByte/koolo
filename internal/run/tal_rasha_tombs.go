@@ -46,6 +46,10 @@ func (a TalRashaTombs) Run() error {
 		// Buff before we start
 		action.Buff()
 
+								a.ctx.CharacterCfg.Character.ClearPathDist = 20
+	if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
+		a.ctx.Logger.Error("Failed to save character configuration: %s", err.Error())}
+
 		// Clear the Tomb
 		if err = action.ClearCurrentLevel(true, data.MonsterAnyFilter()); err != nil {
 			return err
