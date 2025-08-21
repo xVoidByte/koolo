@@ -312,9 +312,6 @@ func EnsureSkillBindings() error {
 		mainSkill = skill.AttackSkill
 	}
 
-	if _, found := ctx.Data.Inventory.Find(item.TomeOfTownPortal, item.LocationInventory); found {
-	}
-
 	notBoundSkills := make([]skill.ID, 0)
 	for _, sk := range skillsToBind {
 		// Only add skills that are not already bound AND are either TomeOfTownPortal or the player has learned them.
@@ -703,34 +700,6 @@ func ResetStats() error {
 				// Shift-click to unequip the item to inventory
 				ctx.HID.ClickWithModifier(game.LeftButton, slotCoords.X, slotCoords.Y, game.CtrlKey)
 				utils.Sleep(500)
-
-				/* Re-read game data to find the item in inventory
-				ctx.GameReader.GetData()
-				utils.Sleep(100)
-
-				// Find the newly unequipped item in inventory by its unique ID
-				var unequippedItemInInventory data.Item
-				inventoryItemsAfterUnequip := ctx.Data.Inventory.ByLocation(item.LocationInventory)
-				for itemIndex := len(inventoryItemsAfterUnequip) - 1; itemIndex >= 0; itemIndex-- {
-					invItem := inventoryItemsAfterUnequip[itemIndex]
-					if invItem.ID == eqItem.ID {
-						unequippedItemInInventory = invItem
-						break
-					}
-				}
-
-				if unequippedItemInInventory.ID != 0 { // Check if we actually found the item
-					ctx.Logger.Debug(fmt.Sprintf("Found unequipped item %s (ID: %d) in inventory. Stashing it.", unequippedItemInInventory.Name, unequippedItemInInventory.ID))
-					// Ctrl-click to stash the item from inventory
-					screenPos := ui.GetScreenCoordsForItem(unequippedItemInInventory)
-					ctx.HID.MovePointer(screenPos.X, screenPos.Y)
-					utils.Sleep(170)
-					ctx.HID.ClickWithModifier(game.LeftButton, screenPos.X, screenPos.Y, game.CtrlKey)
-					utils.Sleep(500)
-				} else {
-					ctx.Logger.Warn(fmt.Sprintf("Could not find unequipped item %s (ID: %d) in inventory after unequip.", eqItem.Name, eqItem.ID))
-				}
-				*/
 
 				utils.Sleep(250)
 				ctx.GameReader.GetData()
