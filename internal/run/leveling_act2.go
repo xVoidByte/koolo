@@ -332,24 +332,6 @@ func (a Leveling) findStaff() error {
 	utils.Sleep(200)
 	action.ItemPickup(-1)
 
-	err = action.ReturnTown()
-	if err != nil {
-		return err
-	}
-
-	utils.Sleep(200)
-	action.UpdateQuestLog()
-	utils.Sleep(200)
-	step.CloseAllMenus()
-	utils.Sleep(200)
-
-	action.InteractNPC(npc.Drognan)
-
-	utils.Sleep(200)
-	action.UpdateQuestLog()
-	utils.Sleep(200)
-	step.CloseAllMenus()
-
 	return nil
 }
 
