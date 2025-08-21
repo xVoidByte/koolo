@@ -359,7 +359,6 @@ func MoveTo(dest data.Position, options ...MoveOption) error {
 		} else {
 			shrineStuckStartTime = time.Time{}
 		}
-		// --- END SHRINE-STUCK LOGIC ---
 
 		if !ctx.Data.CanTeleport() {
 			if time.Since(lastRun) < walkDuration {
@@ -406,7 +405,7 @@ func MoveTo(dest data.Position, options ...MoveOption) error {
 				idleStartTime = time.Time{}
 
 				stuckCounter++
-				if stuckCounter > 5 {
+				if stuckCounter > 100 {
 					stuckLoopAttempts++
 					switch stuckLoopAttempts {
 					case 1:
