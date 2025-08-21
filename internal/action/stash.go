@@ -152,7 +152,7 @@ func stashGold() {
 			clickStashGoldBtn()
 			utils.Sleep(1000) // Increased sleep after first click to ensure dialog appears
 			// After clicking, refresh data again to see if gold is now 0 or less
-			ctx.RefreshGameData() // Crucial: Refresh data to see if gold has been deposited
+			ctx.RefreshGameData()             // Crucial: Refresh data to see if gold has been deposited
 			if ctx.Data.Inventory.Gold == 0 { // Check if all gold was stashed in this tab
 				ctx.Logger.Info("All inventory gold stashed.")
 				return
@@ -185,10 +185,12 @@ func stashInventory(firstRun bool) {
 
 		if dropIt {
 			ctx.Logger.Info(fmt.Sprintf("Dropping item %s [%s] due to MaxQuantity rule.", i.Desc().Name, i.Quality.ToString()))
+			blacklistItem(i) // Blacklist the item to prevent immediate re-pickup
+			utils.Sleep(500)
 			DropItem(i) // Call the new DropItem function
 			utils.Sleep(500)
 			step.CloseAllMenus()
-			continue    // Move to the next item
+			continue // Move to the next item
 		}
 
 		if !stashIt {
@@ -257,12 +259,12 @@ func shouldStashIt(i data.Item, firstRun bool) (bool, bool, string, string) {
 		fmt.Printf("DEBUG: ABSOLUTELY PREVENTING stash for '%s' (Horadric Staff exclusion).\n", i.Name)
 		return false, false, "", "" // Explicitly do NOT stash the Horadric Staff
 	}
-	
+
 	if i.Name == "tomeoftownportal" || i.Name == "tomeofidentify" || i.Name == "key" || i.Name == "wirtsleg" {
 		fmt.Printf("DEBUG: ABSOLUTELY PREVENTING stash for '%s' (Quest/Special item exclusion).\n", i.Name)
 		return false, false, "", ""
 	}
-	
+
 	if _, isLevelingChar := ctx.Char.(context.LevelingCharacter); isLevelingChar && i.IsFromQuest() && i.Name != "HoradricCube" || i.Name == "HoradricStaff" {
 		return false, false, "", ""
 	}
@@ -416,6 +418,12 @@ func dropExcessItems() {
 	}
 }
 
+func blacklistItem(i data.Item) {
+	ctx := context.Get()
+	ctx.CurrentGame.BlacklistedItems = append(ctx.CurrentGame.BlacklistedItems, i)
+	ctx.Logger.Info(fmt.Sprintf("Blacklisted item %s (UnitID: %d) to prevent immediate re-pickup.", i.Name, i.UnitID))
+}
+
 // DropItem handles moving an item from inventory to the ground
 func DropItem(i data.Item) {
 	ctx := context.Get()
@@ -440,10 +448,6 @@ func DropItem(i data.Item) {
 		}
 	}
 	ctx.Logger.Debug(fmt.Sprintf("Successfully dropped item %s (UnitID: %d).", i.Name, i.UnitID))
-	
-	// Add the item to the blacklist after successfully dropping it
-	ctx.CurrentGame.BlacklistedItems = append(ctx.CurrentGame.BlacklistedItems, i)
-	ctx.Logger.Info(fmt.Sprintf("Blacklisted item %s (UnitID: %d) to prevent immediate re-pickup.", i.Name, i.UnitID))
 
 	step.CloseAllMenus()
 }
@@ -464,7 +468,7 @@ func shouldNotifyAboutStashing(i data.Item) bool {
 		for _, runeName := range lowRunes {
 			if itemName == runeName {
 				if !(i.Name == "tirrune" || i.Name == "talrune" || i.Name == "ralrune" || i.Name == "ortrune" || i.Name == "thulrune" || i.Name == "amnrune" || i.Name == "solrune" || i.Name == "lumrune" || i.Name == "nefrune") { // Exclude specific runes from low rune skip logic if they are part of a recipe you want to keep
-				return false
+					return false
 				}
 			}
 		}
@@ -510,7 +514,7 @@ func SwitchStashTab(tab int) {
 		ctx.HID.Click(game.LeftButton, x, y)
 		utils.Sleep(500)
 	}
-	
+
 }
 
 func OpenStash() error {
