@@ -353,10 +353,29 @@ func EnsureSkillBindings() error {
 					ctx.Logger.Error(fmt.Sprintf("Skill %v UI position not found for binding.", skill.SkillNames[sk]))
 					continue
 				}
+
+				if sk == skill.TomeOfTownPortal {
+					gfx := "D2R"
+					if ctx.GameReader.LegacyGraphics() {
+						gfx = "Legacy"
+					}
+					ctx.Logger.Info(fmt.Sprintf("TomeOfTownPortal will be bound now at (%d,%d) [%s]", skillPosition.X, skillPosition.Y, gfx))
+					ctx.Logger.Info(fmt.Sprintf("EnsureSkillBindings Tome coords (secondary): X=%d Y=%d [Legacy=%v]", skillPosition.X, skillPosition.Y, ctx.GameReader.LegacyGraphics()))
+				}
+
 				ctx.HID.MovePointer(skillPosition.X, skillPosition.Y)
 				utils.Sleep(100)
 				ctx.HID.PressKeyBinding(availableKB[i])
 				utils.Sleep(300)
+				if sk == skill.TomeOfTownPortal {
+					ctx.GameReader.GetData()
+					utils.Sleep(150)
+					if _, ok := ctx.Data.KeyBindings.KeyBindingForSkill(skill.TomeOfTownPortal); ok {
+						ctx.Logger.Info("TomeOfTownPortal binding verified")
+					} else {
+						ctx.Logger.Warn("TomeOfTownPortal binding verification failed after click")
+					}
+				}
 			}
 		} else {
 			if _, found := ctx.Data.KeyBindings.KeyBindingForSkill(skill.FireBolt); !found {
@@ -404,9 +423,9 @@ func ResetBindings() error {
 	ctx := context.Get()
 	ctx.SetLastAction("BindTomeOfTownPortalToFKeys") // Updated action name
 
-	// 1. Check if Tome of Town Portal skill is known by the player
-	if _, found := ctx.Data.PlayerUnit.Skills[skill.TomeOfTownPortal]; !found {
-		ctx.Logger.Debug("TomeOfTownPortal skill not found for player. Skipping F-key binding sequence.")
+	// 1. Check if Tome of Town Portal is available in inventory (inventory-based check for legacy compatibility)
+	if _, found := ctx.Data.Inventory.Find(item.TomeOfTownPortal, item.LocationInventory); !found {
+		ctx.Logger.Debug("TomeOfTownPortal tome not found in inventory. Skipping F-key binding sequence.")
 		return nil
 	}
 
@@ -453,8 +472,13 @@ func ResetBindings() error {
 func calculateSkillPositionInUI(mainSkill bool, skillID skill.ID) (data.Position, bool) {
 	ctx := context.Get()
 
+	foundInSkills := true
 	if _, found := ctx.Data.PlayerUnit.Skills[skillID]; !found {
-		return data.Position{}, false
+		if skillID == skill.TomeOfTownPortal {
+			foundInSkills = false
+		} else {
+			return data.Position{}, false
+		}
 	}
 
 	targetSkill := skill.Skills[skillID]
@@ -484,10 +508,24 @@ func calculateSkillPositionInUI(mainSkill bool, skillID skill.ID) (data.Position
 
 	}
 
+	if !foundInSkills {
+		totalRows = append(totalRows, targetSkill.Desc().ListRow)
+		pageSkills[targetSkill.Desc().Page] = append(pageSkills[targetSkill.Desc().Page], skillID)
+	}
+
+	if ctx.GameReader.LegacyGraphics() && !mainSkill && skillID == skill.TomeOfTownPortal {
+		if _, hasIdentify := ctx.Data.Inventory.Find(item.TomeOfIdentify, item.LocationInventory); hasIdentify {
+			if _, identifyInSkills := ctx.Data.PlayerUnit.Skills[skill.TomeOfIdentify]; !identifyInSkills {
+				identifyDesc := skill.Skills[skill.TomeOfIdentify].Desc()
+				totalRows = append(totalRows, identifyDesc.ListRow)
+				pageSkills[targetSkill.Desc().Page] = append(pageSkills[targetSkill.Desc().Page], skill.TomeOfIdentify)
+			}
+		}
+	}
+
 	slices.Sort(totalRows)
 	totalRows = slices.Compact(totalRows)
 
-	// If we don't have any skill of a specific tree, the entire row gets one line down
 	for i, currentRow := range totalRows {
 		if currentRow == targetSkill.Desc().ListRow {
 			row = i
@@ -504,9 +542,27 @@ func calculateSkillPositionInUI(mainSkill bool, skillID skill.ID) (data.Position
 		}
 	}
 
+	// Special handling for Legacy + secondary list + TomeOfTownPortal:
+	// Column is determined by presence of TomeOfIdentify (left shift by one slot when present)
+	if ctx.GameReader.LegacyGraphics() && !mainSkill && skillID == skill.TomeOfTownPortal {
+		if _, hasIdentify := ctx.Data.Inventory.Find(item.TomeOfIdentify, item.LocationInventory); hasIdentify {
+			column = 1
+		} else {
+			column = 0
+		}
+	}
+
 	if ctx.GameReader.LegacyGraphics() {
 		skillOffsetX := ui.MainSkillListFirstSkillXClassic + (ui.SkillListSkillOffsetClassic * column)
 		if !mainSkill {
+			if skillID == skill.TomeOfTownPortal {
+				if column == 0 {
+					return data.Position{X: 1000, Y: ui.SkillListFirstSkillYClassic - ui.SkillListSkillOffsetClassic*row}, true
+				}
+				if column == 1 {
+					return data.Position{X: 940, Y: ui.SkillListFirstSkillYClassic - ui.SkillListSkillOffsetClassic*row}, true
+				}
+			}
 			skillOffsetX = ui.SecondarySkillListFirstSkillXClassic - (ui.SkillListSkillOffsetClassic * column)
 		}
 
