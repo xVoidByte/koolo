@@ -111,12 +111,12 @@ func (a Leveling) act1() error {
 	// Tristram only until lvl 6, then Trist + Act1 Progression (good exp, less town chores)
 	if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Normal && lvl.Value < 12 {
 
-		a.ctx.CharacterCfg.Character.ClearPathDist = 9
+		a.ctx.CharacterCfg.Character.ClearPathDist = 4
 		if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
 			a.ctx.Logger.Error("Failed to save character configuration: %s", err.Error())
 		}
 
-		if lvl.Value < 6 {
+		if lvl.Value < 12 {
 			// Run Tristram and end the function
 			return NewTristram().Run()
 		} else {
@@ -134,7 +134,7 @@ func (a Leveling) act1() error {
 	} else {
 		// Run Andariel to complete quest
 
-		a.ctx.CharacterCfg.Character.ClearPathDist = 4
+		a.ctx.CharacterCfg.Character.ClearPathDist = 7
 		a.ctx.CharacterCfg.Inventory.BeltColumns = [4]string{"healing", "healing", "mana", "mana"}
 		if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
 			a.ctx.Logger.Error("Failed to save character configuration: %s", err.Error())
@@ -156,7 +156,6 @@ func (a Leveling) setupLevelOneConfig() {
 	a.ctx.CharacterCfg.Character.UseTeleport = true
 	a.ctx.CharacterCfg.Character.UseMerc = false
 	a.ctx.CharacterCfg.Game.UseCainIdentify = true
-	a.ctx.CharacterCfg.ClassicMode = false
 	a.ctx.CharacterCfg.CloseMiniPanel = false
 	a.ctx.CharacterCfg.Health.HealingPotionAt = 40
 	a.ctx.CharacterCfg.Health.ManaPotionAt = 25

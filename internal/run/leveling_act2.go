@@ -337,12 +337,17 @@ func (a Leveling) findStaff() error {
 		return err
 	}
 
+	utils.Sleep(200)
 	action.UpdateQuestLog()
+	utils.Sleep(200)
 	step.CloseAllMenus()
+	utils.Sleep(200)
 
 	action.InteractNPC(npc.Drognan)
 
+	utils.Sleep(200)
 	action.UpdateQuestLog()
+	utils.Sleep(200)
 	step.CloseAllMenus()
 
 	return nil

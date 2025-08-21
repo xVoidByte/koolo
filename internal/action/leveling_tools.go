@@ -624,6 +624,7 @@ func HireMerc() error {
 		// Hire the merc if we don't have one, we have enough gold, and we are in act 2.
 		if ctx.CharacterCfg.Game.Difficulty == difficulty.Normal && (ctx.Data.MercHPPercent() <= 0 || !isMercenaryPresent(npc.Guard)) && ctx.Data.PlayerUnit.TotalPlayerGold() > 5000 && ctx.Data.PlayerUnit.Area == area.LutGholein {
 			ctx.Logger.Info("Hiring merc...")
+
 			// TODO: Hire Holy Freeze merc if available, if not, hire Defiance merc.
 			err := InteractNPC(town.GetTownByArea(ctx.Data.PlayerUnit.Area).MercContractorNPC())
 			if err != nil {
@@ -632,9 +633,7 @@ func HireMerc() error {
 			ctx.HID.KeySequence(win.VK_HOME, win.VK_DOWN, win.VK_RETURN)
 			utils.Sleep(2000)
 			if ctx.Data.LegacyGraphics {
-				ctx.HID.Click(game.LeftButton, ui.FirstMercFromContractorListXClassic, ui.FirstMercFromContractorListYClassic)
-				utils.Sleep(50)
-				ctx.HID.Click(game.LeftButton, ui.FirstMercFromContractorListXClassic, ui.FirstMercFromContractorListYClassic)
+				ctx.HID.KeySequence(win.VK_RETURN)
 			} else {
 				ctx.HID.Click(game.LeftButton, ui.FirstMercFromContractorListX, ui.FirstMercFromContractorListY)
 				utils.Sleep(50)
