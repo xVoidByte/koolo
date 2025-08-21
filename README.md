@@ -1,3 +1,15 @@
+The sorceress leveling feature has been completed.
+
+As written more detailed below you need to install:
+
+- Go
+- Garble
+
+Use better_build.bat to build the application. 
+
+For more information there's a discord server mentioned below. Read the information in the f.a.q. and initial-setup channels. The LoD Version 1.13c is pinned in the general channel.
+
+---
 <div style="background-color: #FFFACD; padding: 10px; border-radius: 5px; text-align: center">
   <h2 style="margin: 0;">⚠️ Warning: People using this tool have been reporting bans. Do not use it.</h2>
 </div>
