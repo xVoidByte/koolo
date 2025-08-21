@@ -186,6 +186,7 @@ func stashInventory(firstRun bool) {
 		if dropIt {
 			ctx.Logger.Info(fmt.Sprintf("Dropping item %s [%s] due to MaxQuantity rule.", i.Desc().Name, i.Quality.ToString()))
 			DropItem(i) // Call the new DropItem function
+			utils.Sleep(500)
 			step.CloseAllMenus()
 			continue    // Move to the next item
 		}
@@ -427,19 +428,23 @@ func DropItem(i data.Item) {
 	screenPos := ui.GetScreenCoordsForItem(i)
 	ctx.HID.MovePointer(screenPos.X, screenPos.Y)
 	utils.Sleep(170)
-	ctx.HID.ClickWithModifier(game.LeftButton, screenPos.X, screenPos.Y, game.CtrlKey) // Changed to CtrlKey as per your request
-	utils.Sleep(500)                                                                     // Give game time to process the drop
+	ctx.HID.ClickWithModifier(game.LeftButton, screenPos.X, screenPos.Y, game.CtrlKey)
+	utils.Sleep(500)
 	step.CloseAllMenus()
 	utils.Sleep(170)
-	ctx.RefreshGameData() // Refresh to confirm item is gone from inventory
+	ctx.RefreshGameData()
 	for _, it := range ctx.Data.Inventory.ByLocation(item.LocationInventory) {
 		if it.UnitID == i.UnitID {
 			ctx.Logger.Warn(fmt.Sprintf("Failed to drop item %s (UnitID: %d), still in inventory. Inventory might be full or area restricted.", i.Name, i.UnitID))
-			return // Item is still in inventory, drop failed
+			return
 		}
 	}
 	ctx.Logger.Debug(fmt.Sprintf("Successfully dropped item %s (UnitID: %d).", i.Name, i.UnitID))
 	
+	// Add the item to the blacklist after successfully dropping it
+	ctx.CurrentGame.BlacklistedItems = append(ctx.CurrentGame.BlacklistedItems, i)
+	ctx.Logger.Info(fmt.Sprintf("Blacklisted item %s (UnitID: %d) to prevent immediate re-pickup.", i.Name, i.UnitID))
+
 	step.CloseAllMenus()
 }
 
