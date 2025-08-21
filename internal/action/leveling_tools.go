@@ -353,6 +353,7 @@ func EnsureSkillBindings() error {
 					ctx.Logger.Error(fmt.Sprintf("Skill %v UI position not found for binding.", skill.SkillNames[sk]))
 					continue
 				}
+
 				if sk == skill.TomeOfTownPortal {
 					gfx := "D2R"
 					if ctx.GameReader.LegacyGraphics() {
@@ -361,6 +362,7 @@ func EnsureSkillBindings() error {
 					ctx.Logger.Info(fmt.Sprintf("TomeOfTownPortal will be bound now at (%d,%d) [%s]", skillPosition.X, skillPosition.Y, gfx))
 					ctx.Logger.Info(fmt.Sprintf("EnsureSkillBindings Tome coords (secondary): X=%d Y=%d [Legacy=%v]", skillPosition.X, skillPosition.Y, ctx.GameReader.LegacyGraphics()))
 				}
+
 				ctx.HID.MovePointer(skillPosition.X, skillPosition.Y)
 				utils.Sleep(100)
 				ctx.HID.PressKeyBinding(availableKB[i])
@@ -427,6 +429,7 @@ func ResetBindings() error {
 		return nil
 	}
 
+	// Determine the skill position once, as it's always TomeOfTownPortal
 	skillPosition, found := calculateSkillPositionInUI(false, skill.TomeOfTownPortal)
 	if !found {
 		ctx.Logger.Error("TomeOfTownPortal skill UI position not found. Cannot proceed with F-key binding.")
@@ -461,6 +464,8 @@ func ResetBindings() error {
 
 		utils.Sleep(500) // Delay after closing for the next iteration
 	}
+
+	ctx.Logger.Info("TomeOfTownPortal binding to F1-F8 sequence completed.")
 	return nil
 }
 
@@ -508,6 +513,16 @@ func calculateSkillPositionInUI(mainSkill bool, skillID skill.ID) (data.Position
 		pageSkills[targetSkill.Desc().Page] = append(pageSkills[targetSkill.Desc().Page], skillID)
 	}
 
+	if ctx.GameReader.LegacyGraphics() && !mainSkill && skillID == skill.TomeOfTownPortal {
+		if _, hasIdentify := ctx.Data.Inventory.Find(item.TomeOfIdentify, item.LocationInventory); hasIdentify {
+			if _, identifyInSkills := ctx.Data.PlayerUnit.Skills[skill.TomeOfIdentify]; !identifyInSkills {
+				identifyDesc := skill.Skills[skill.TomeOfIdentify].Desc()
+				totalRows = append(totalRows, identifyDesc.ListRow)
+				pageSkills[targetSkill.Desc().Page] = append(pageSkills[targetSkill.Desc().Page], skill.TomeOfIdentify)
+			}
+		}
+	}
+
 	slices.Sort(totalRows)
 	totalRows = slices.Compact(totalRows)
 
@@ -540,6 +555,14 @@ func calculateSkillPositionInUI(mainSkill bool, skillID skill.ID) (data.Position
 	if ctx.GameReader.LegacyGraphics() {
 		skillOffsetX := ui.MainSkillListFirstSkillXClassic + (ui.SkillListSkillOffsetClassic * column)
 		if !mainSkill {
+			if skillID == skill.TomeOfTownPortal {
+				if column == 0 {
+					return data.Position{X: 1000, Y: ui.SkillListFirstSkillYClassic - ui.SkillListSkillOffsetClassic*row}, true
+				}
+				if column == 1 {
+					return data.Position{X: 940, Y: ui.SkillListFirstSkillYClassic - ui.SkillListSkillOffsetClassic*row}, true
+				}
+			}
 			skillOffsetX = ui.SecondarySkillListFirstSkillXClassic - (ui.SkillListSkillOffsetClassic * column)
 		}
 
@@ -558,12 +581,6 @@ func calculateSkillPositionInUI(mainSkill bool, skillID skill.ID) (data.Position
 			Y: ui.SkillListFirstSkillY - ui.SkillListSkillOffset*row,
 		}, true
 	}
-}
-
-// GetSkillUIPosition returns the UI screen coordinates for the given skill and mouse button side.
-// mainSkill=true computes coordinates for the left-click (main) list; false for the right-click (secondary) list.
-func GetSkillUIPosition(mainSkill bool, skillID skill.ID) (data.Position, bool) {
-	return calculateSkillPositionInUI(mainSkill, skillID)
 }
 
 func UpdateQuestLog() error {
