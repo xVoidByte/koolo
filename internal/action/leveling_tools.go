@@ -2,8 +2,8 @@ package action
 
 import (
 	"fmt"
-	"slices"
 	"log/slog"
+	"slices"
 
 	"github.com/hectorgimenez/koolo/internal/action/step"
 	"github.com/hectorgimenez/koolo/internal/context"
@@ -112,35 +112,34 @@ func getEquippedSlotCoords(bodyLoc item.LocationType, legacyGraphics bool) (data
 // dropItemFromInventoryUI is a helper function to drop an item that is already in the inventory
 // It assumes the inventory is already open and does NOT close it afterward.
 func dropItemFromInventoryUI(i data.Item) error {
-    ctx := context.Get()
+	ctx := context.Get()
 
-    // Define a list of item types to exclude from dropping.
-    var excludedTypes = []string{
-        "jave", "tkni", "taxe", "spea", "pole", "mace",
-        "club", "hamm", "swor", "knif", "axe", "wand", "staff", "scep",
-        "h2h", "h2h2", "orb", "shie", "ashd", // Shields
-    }
+	// Define a list of item types to exclude from dropping.
+	var excludedTypes = []string{
+		"jave", "tkni", "taxe", "spea", "pole", "mace",
+		"club", "hamm", "swor", "knif", "axe", "wand", "staff", "scep",
+		"h2h", "h2h2", "orb", "shie", "ashd", // Shields
+	}
 
-    // Check if the item's type is in the list of excluded types.
-    if slices.Contains(excludedTypes, string(i.Desc().Type)) {
-        ctx.Logger.Debug(fmt.Sprintf("EXCLUDING: Skipping drop for %s (ID: %d) as it is an excluded item type.", i.Name, i.ID))
-        return nil
-    }
+	// Check if the item's type is in the list of excluded types.
+	if slices.Contains(excludedTypes, string(i.Desc().Type)) {
+		ctx.Logger.Debug(fmt.Sprintf("EXCLUDING: Skipping drop for %s (ID: %d) as it is an excluded item type.", i.Name, i.ID))
+		return nil
+	}
 
-    if i.Name == "TomeOfTownPortal" || i.Name == "TomeOfIdentify" {
-        ctx.Logger.Debug(fmt.Sprintf("EXCLUDING: Skipping drop for %s (ID: %d) as per rule.", i.Name, i.ID))
-        return nil
-    }
+	if i.Name == "TomeOfTownPortal" || i.Name == "TomeOfIdentify" {
+		ctx.Logger.Debug(fmt.Sprintf("EXCLUDING: Skipping drop for %s (ID: %d) as per rule.", i.Name, i.ID))
+		return nil
+	}
 
-    screenPos := ui.GetScreenCoordsForItem(i)
-    ctx.HID.MovePointer(screenPos.X, screenPos.Y)
-    utils.Sleep(100)
-    ctx.HID.ClickWithModifier(game.LeftButton, screenPos.X, screenPos.Y, game.CtrlKey)
-    utils.Sleep(300)
+	screenPos := ui.GetScreenCoordsForItem(i)
+	ctx.HID.MovePointer(screenPos.X, screenPos.Y)
+	utils.Sleep(100)
+	ctx.HID.ClickWithModifier(game.LeftButton, screenPos.X, screenPos.Y, game.CtrlKey)
+	utils.Sleep(300)
 
-    return nil
+	return nil
 }
-
 
 func EnsureStatPoints() error {
 	ctx := context.Get()
@@ -308,14 +307,12 @@ func EnsureSkillBindings() error {
 	level, _ := ctx.Data.PlayerUnit.FindStat(stat.Level, 0)
 	mainSkill, skillsToBind := char.SkillsToBind()
 
-
 	if level.Value < 15 {
 		ctx.Logger.Debug("Player under level 15, forcing 'Attack' as main (left-click) skill.")
 		mainSkill = skill.AttackSkill
 	}
 
-
-	if _, found := ctx.Data.Inventory.Find(item.TomeOfTownPortal, item.LocationInventory); found {		
+	if _, found := ctx.Data.Inventory.Find(item.TomeOfTownPortal, item.LocationInventory); found {
 	}
 
 	notBoundSkills := make([]skill.ID, 0)
@@ -356,10 +353,27 @@ func EnsureSkillBindings() error {
 					ctx.Logger.Error(fmt.Sprintf("Skill %v UI position not found for binding.", skill.SkillNames[sk]))
 					continue
 				}
+				if sk == skill.TomeOfTownPortal {
+					gfx := "D2R"
+					if ctx.GameReader.LegacyGraphics() {
+						gfx = "Legacy"
+					}
+					ctx.Logger.Info(fmt.Sprintf("TomeOfTownPortal will be bound now at (%d,%d) [%s]", skillPosition.X, skillPosition.Y, gfx))
+					ctx.Logger.Info(fmt.Sprintf("EnsureSkillBindings Tome coords (secondary): X=%d Y=%d [Legacy=%v]", skillPosition.X, skillPosition.Y, ctx.GameReader.LegacyGraphics()))
+				}
 				ctx.HID.MovePointer(skillPosition.X, skillPosition.Y)
 				utils.Sleep(100)
 				ctx.HID.PressKeyBinding(availableKB[i])
 				utils.Sleep(300)
+				if sk == skill.TomeOfTownPortal {
+					ctx.GameReader.GetData()
+					utils.Sleep(150)
+					if _, ok := ctx.Data.KeyBindings.KeyBindingForSkill(skill.TomeOfTownPortal); ok {
+						ctx.Logger.Info("TomeOfTownPortal binding verified")
+					} else {
+						ctx.Logger.Warn("TomeOfTownPortal binding verification failed after click")
+					}
+				}
 			}
 		} else {
 			if _, found := ctx.Data.KeyBindings.KeyBindingForSkill(skill.FireBolt); !found {
@@ -407,13 +421,12 @@ func ResetBindings() error {
 	ctx := context.Get()
 	ctx.SetLastAction("BindTomeOfTownPortalToFKeys") // Updated action name
 
-	// 1. Check if Tome of Town Portal skill is known by the player
-	if _, found := ctx.Data.PlayerUnit.Skills[skill.TomeOfTownPortal]; !found {
-		ctx.Logger.Debug("TomeOfTownPortal skill not found for player. Skipping F-key binding sequence.")
+	// 1. Check if Tome of Town Portal is available in inventory (inventory-based check for legacy compatibility)
+	if _, found := ctx.Data.Inventory.Find(item.TomeOfTownPortal, item.LocationInventory); !found {
+		ctx.Logger.Debug("TomeOfTownPortal tome not found in inventory. Skipping F-key binding sequence.")
 		return nil
 	}
 
-	// Determine the skill position once, as it's always TomeOfTownPortal
 	skillPosition, found := calculateSkillPositionInUI(false, skill.TomeOfTownPortal)
 	if !found {
 		ctx.Logger.Error("TomeOfTownPortal skill UI position not found. Cannot proceed with F-key binding.")
@@ -421,9 +434,9 @@ func ResetBindings() error {
 		return fmt.Errorf("TomeOfTownPortal skill UI position not found")
 	}
 
-	// Loop for F1 through F8 
+	// Loop for F1 through F8
 	for i := 0; i < 8; i++ {
-		fKey := byte(win.VK_F1 + i) // win.VK_F1 is 0x70, win.VK_F2 is 0x71, and so on.
+		fKey := byte(win.VK_F1 + i)                            // win.VK_F1 is 0x70, win.VK_F2 is 0x71, and so on.
 		fKeyBinding := data.KeyBinding{Key1: [2]byte{fKey, 0}} // Assuming 0 for no modifier key
 		ctx.Logger.Info(fmt.Sprintf("Attempting to bind TomeOfTownPortal to F%d", i+1))
 
@@ -448,17 +461,19 @@ func ResetBindings() error {
 
 		utils.Sleep(500) // Delay after closing for the next iteration
 	}
-
-	ctx.Logger.Info("TomeOfTownPortal binding to F1-F8 sequence completed.")
 	return nil
 }
-
 
 func calculateSkillPositionInUI(mainSkill bool, skillID skill.ID) (data.Position, bool) {
 	ctx := context.Get()
 
+	foundInSkills := true
 	if _, found := ctx.Data.PlayerUnit.Skills[skillID]; !found {
-		return data.Position{}, false
+		if skillID == skill.TomeOfTownPortal {
+			foundInSkills = false
+		} else {
+			return data.Position{}, false
+		}
 	}
 
 	targetSkill := skill.Skills[skillID]
@@ -488,16 +503,20 @@ func calculateSkillPositionInUI(mainSkill bool, skillID skill.ID) (data.Position
 
 	}
 
+	if !foundInSkills {
+		totalRows = append(totalRows, targetSkill.Desc().ListRow)
+		pageSkills[targetSkill.Desc().Page] = append(pageSkills[targetSkill.Desc().Page], skillID)
+	}
+
 	slices.Sort(totalRows)
 	totalRows = slices.Compact(totalRows)
 
-	// If we don't have any skill of a specific tree, the entire row gets one line down
 	for i, currentRow := range totalRows {
 		if currentRow == targetSkill.Desc().ListRow {
 			row = i
 			break
 		}
-		}
+	}
 
 	skillsInPage := pageSkills[targetSkill.Desc().Page]
 	slices.Sort(skillsInPage)
@@ -505,6 +524,16 @@ func calculateSkillPositionInUI(mainSkill bool, skillID skill.ID) (data.Position
 		if skills == targetSkill.ID {
 			column = i
 			break
+		}
+	}
+
+	// Special handling for Legacy + secondary list + TomeOfTownPortal:
+	// Column is determined by presence of TomeOfIdentify (left shift by one slot when present)
+	if ctx.GameReader.LegacyGraphics() && !mainSkill && skillID == skill.TomeOfTownPortal {
+		if _, hasIdentify := ctx.Data.Inventory.Find(item.TomeOfIdentify, item.LocationInventory); hasIdentify {
+			column = 1
+		} else {
+			column = 0
 		}
 	}
 
@@ -531,6 +560,12 @@ func calculateSkillPositionInUI(mainSkill bool, skillID skill.ID) (data.Position
 	}
 }
 
+// GetSkillUIPosition returns the UI screen coordinates for the given skill and mouse button side.
+// mainSkill=true computes coordinates for the left-click (main) list; false for the right-click (secondary) list.
+func GetSkillUIPosition(mainSkill bool, skillID skill.ID) (data.Position, bool) {
+	return calculateSkillPositionInUI(mainSkill, skillID)
+}
+
 func UpdateQuestLog() error {
 	ctx := context.Get()
 	ctx.SetLastAction("UpdateQuestLog")
@@ -547,53 +582,53 @@ func UpdateQuestLog() error {
 
 // isMercenaryPresent checks for the existence of an Act 2 mercenary
 func isMercenaryPresent(mercName npc.ID) bool {
-    ctx := context.Get()
-    for _, monster := range ctx.Data.Monsters {
-        if monster.IsMerc() && monster.Name == mercName {
-            ctx.Logger.Debug(fmt.Sprintf("Mercenary of type %v is already present.", mercName))
-            return true
-        }
-    }
-    return false
+	ctx := context.Get()
+	for _, monster := range ctx.Data.Monsters {
+		if monster.IsMerc() && monster.Name == mercName {
+			ctx.Logger.Debug(fmt.Sprintf("Mercenary of type %v is already present.", mercName))
+			return true
+		}
+	}
+	return false
 }
 
 func HireMerc() error {
-    ctx := context.Get()
-    ctx.SetLastAction("HireMerc")
+	ctx := context.Get()
+	ctx.SetLastAction("HireMerc")
 
-    _, isLevelingChar := ctx.Char.(context.LevelingCharacter)
-    if isLevelingChar && ctx.CharacterCfg.Character.UseMerc {
-        // Check if we already have an Act 2 mercenary
-        if isMercenaryPresent(npc.Guard) {
-            ctx.Logger.Debug("An Act 2 merc is already present, no need to hire a new one.")
-            return nil
-        }
-        
-        // Hire the merc if we don't have one, we have enough gold, and we are in act 2.
-        if ctx.CharacterCfg.Game.Difficulty == difficulty.Normal && (ctx.Data.MercHPPercent() <= 0 || !isMercenaryPresent(npc.Guard)) && ctx.Data.PlayerUnit.TotalPlayerGold() > 5000 && ctx.Data.PlayerUnit.Area == area.LutGholein {
-            ctx.Logger.Info("Hiring merc...")
-            // TODO: Hire Holy Freeze merc if available, if not, hire Defiance merc.
-            err := InteractNPC(town.GetTownByArea(ctx.Data.PlayerUnit.Area).MercContractorNPC())
-            if err != nil {
-                return err
-            }
-            ctx.HID.KeySequence(win.VK_HOME, win.VK_DOWN, win.VK_RETURN)
-            utils.Sleep(2000)
-            if ctx.Data.LegacyGraphics {
-                ctx.HID.Click(game.LeftButton, ui.FirstMercFromContractorListXClassic, ui.FirstMercFromContractorListYClassic)
-                utils.Sleep(50)
-                ctx.HID.Click(game.LeftButton, ui.FirstMercFromContractorListXClassic, ui.FirstMercFromContractorListYClassic)
-            } else {
-                ctx.HID.Click(game.LeftButton, ui.FirstMercFromContractorListX, ui.FirstMercFromContractorListY)
-                utils.Sleep(50)
-                ctx.HID.Click(game.LeftButton, ui.FirstMercFromContractorListX, ui.FirstMercFromContractorListY)
-            }
-            utils.Sleep(2000)
-            ctx.HID.KeySequence(win.VK_HOME, win.VK_RETURN)
-        }
-    }
+	_, isLevelingChar := ctx.Char.(context.LevelingCharacter)
+	if isLevelingChar && ctx.CharacterCfg.Character.UseMerc {
+		// Check if we already have an Act 2 mercenary
+		if isMercenaryPresent(npc.Guard) {
+			ctx.Logger.Debug("An Act 2 merc is already present, no need to hire a new one.")
+			return nil
+		}
 
-    return nil
+		// Hire the merc if we don't have one, we have enough gold, and we are in act 2.
+		if ctx.CharacterCfg.Game.Difficulty == difficulty.Normal && (ctx.Data.MercHPPercent() <= 0 || !isMercenaryPresent(npc.Guard)) && ctx.Data.PlayerUnit.TotalPlayerGold() > 5000 && ctx.Data.PlayerUnit.Area == area.LutGholein {
+			ctx.Logger.Info("Hiring merc...")
+			// TODO: Hire Holy Freeze merc if available, if not, hire Defiance merc.
+			err := InteractNPC(town.GetTownByArea(ctx.Data.PlayerUnit.Area).MercContractorNPC())
+			if err != nil {
+				return err
+			}
+			ctx.HID.KeySequence(win.VK_HOME, win.VK_DOWN, win.VK_RETURN)
+			utils.Sleep(2000)
+			if ctx.Data.LegacyGraphics {
+				ctx.HID.Click(game.LeftButton, ui.FirstMercFromContractorListXClassic, ui.FirstMercFromContractorListYClassic)
+				utils.Sleep(50)
+				ctx.HID.Click(game.LeftButton, ui.FirstMercFromContractorListXClassic, ui.FirstMercFromContractorListYClassic)
+			} else {
+				ctx.HID.Click(game.LeftButton, ui.FirstMercFromContractorListX, ui.FirstMercFromContractorListY)
+				utils.Sleep(50)
+				ctx.HID.Click(game.LeftButton, ui.FirstMercFromContractorListX, ui.FirstMercFromContractorListY)
+			}
+			utils.Sleep(2000)
+			ctx.HID.KeySequence(win.VK_HOME, win.VK_RETURN)
+		}
+	}
+
+	return nil
 }
 
 func ResetStats() error {
