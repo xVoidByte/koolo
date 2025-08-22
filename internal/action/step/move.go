@@ -10,7 +10,6 @@ import (
 	"github.com/hectorgimenez/d2go/pkg/data"
 	"github.com/hectorgimenez/d2go/pkg/data/object"
 	"github.com/hectorgimenez/d2go/pkg/data/skill"
-	"github.com/hectorgimenez/d2go/pkg/data/stat"
 	"github.com/hectorgimenez/d2go/pkg/data/state"
 	"github.com/hectorgimenez/koolo/internal/context"
 	"github.com/hectorgimenez/koolo/internal/game"
@@ -44,6 +43,7 @@ var prioritizedShrines = []struct {
 	{shrineType: object.SkillShrine, state: state.ShrineSkill},
 }
 
+// New list of shrines to prioritize when a curse is active
 var curseBreakingShrines = []object.ShrineType{
 	object.ExperienceShrine,
 	object.ManaRegenShrine,
@@ -137,6 +137,14 @@ func MoveTo(dest data.Position, options ...MoveOption) error {
 	const minMovementThreshold = 30
 	failedToPathToShrine := make(map[data.Position]time.Time)
 	var shrineDestination data.Position
+	var obstacleDestination data.Position
+	var obstacleObject *data.Object
+	
+	// New variables for Shrine-Stuck logic
+	var shrineStuckStartTime time.Time
+	var shrineStuckReferencePosition data.Position
+	const shrineStuckThreshold = 2 * time.Second
+	const shrineMovementThreshold = 5.0
 
 	for {
 		ctx.PauseIfNotPriority()
@@ -162,21 +170,87 @@ func MoveTo(dest data.Position, options ...MoveOption) error {
 			}
 		}
 
-		if shrineDestination != (data.Position{}) {
+		// Handle obstacles. Prioritize immediate obstacles, then obstacles in path.
+		if !ctx.Data.CanTeleport() {
+			// Prioritize objects in the immediate vicinity first
+			if objectToInteract, found := handleImmediateObstacles(); found {
+				obstacleDestination = objectToInteract.Position
+				obstacleObject = objectToInteract
+			} else {
+				// Then, check for obstacles directly in the path
+				obstaclePos, obj, err := handleDoorsInPath(currentDest, openedDoors)
+				if err != nil {
+					return err
+				}
+				if obstaclePos != (data.Position{}) {
+					obstacleDestination = obstaclePos
+					obstacleObject = obj
+				}
+			}
+		}
+		
+		if obstacleDestination != (data.Position{}) {
+			currentDest = obstacleDestination
+		} else if shrineDestination != (data.Position{}) {
 			currentDest = shrineDestination
 		} else {
 			currentDest = dest
 		}
 
-		currentDistanceToDest := ctx.PathFinder.DistanceFromMe(currentDest)
+		// --- MONSTER CHECK LOGIC ---
+		if time.Since(stepLastMonsterCheck) > stepMonsterCheckInterval {
+			if obstacleDestination == (data.Position{}) {
+				_, found := findClosestMonsterInPath(currentDest)
+				stepLastMonsterCheck = time.Now()
+
+				if found {
+					ctx.Logger.Debug("Monsters detected within safe zone for non-teleporter. Engaging enemies before attempting movement.")
+					return ErrMonstersInPath
+				}
+			}
+		}
+
+		currentDistanceToDest := float64(ctx.PathFinder.DistanceFromMe(currentDest))
 		if opts.stationaryMinDistance != nil && opts.stationaryMaxDistance != nil {
-			if currentDistanceToDest >= *opts.stationaryMinDistance && currentDistanceToDest <= *opts.stationaryMaxDistance {
-				ctx.Logger.Debug(fmt.Sprintf("MoveTo: Reached stationary distance %d-%d (current %d)", *opts.stationaryMinDistance, *opts.stationaryMaxDistance, currentDistanceToDest))
+			if currentDistanceToDest >= float64(*opts.stationaryMinDistance) && currentDistanceToDest <= float64(*opts.stationaryMaxDistance) {
+				ctx.Logger.Debug(fmt.Sprintf("MoveTo: Reached stationary distance %d-%d (current %.2f)", *opts.stationaryMinDistance, *opts.stationaryMaxDistance, currentDistanceToDest))
 				return nil
 			}
 		}
 		
-		if currentDistanceToDest < minDistanceToFinishMoving {
+		if currentDistanceToDest < float64(minDistanceToFinishMoving) {
+			if obstacleDestination != (data.Position{}) {
+				if obstacleObject != nil {
+					// Check for breakable object first
+					if isBreakable(obstacleObject.Name) {
+						err := InteractWithObject(*obstacleObject)
+						if err != nil {
+							ctx.Logger.Warn("Failed to destroy breakable object", slog.Any("error", err))
+						} else {
+							ctx.Logger.Debug("Breakable object successfully destroyed.")
+						}
+					} else if obstacleObject.IsDoor() { // Then check for doors
+						ctx.Logger.Debug("Reached door, attempting to open it.")
+						err := InteractObject(*obstacleObject, func() bool {
+							obj, found := ctx.Data.Objects.FindByID(obstacleObject.ID)
+							return found && !obj.Selectable
+						})
+
+						if err != nil {
+							ctx.Logger.Warn("Failed to open door", slog.Any("error", err))
+						} else {
+							ctx.Logger.Debug("Door successfully opened.")
+						}
+					}
+				}
+				obstacleDestination = data.Position{}
+				obstacleObject = nil
+				if obstacleObject != nil {
+					openedDoors[obstacleObject.Name] = obstacleObject.Position
+				}
+				continue
+			}
+
 			if shrineDestination != (data.Position{}) && shrineDestination == currentDest {
 				shrineFound := false
 				var shrineObject data.Object
@@ -203,12 +277,44 @@ func MoveTo(dest data.Position, options ...MoveOption) error {
 			}
 		}
 
-		if !ctx.Data.CanTeleport() {
-			obstacleHandled := handleObstaclesInPath(currentDest, openedDoors)
-			if obstacleHandled {
-				continue
+		// --- SHRINE-STUCK LOGIC ---
+		if currentDest == shrineDestination {
+			currentPosition := ctx.Data.PlayerUnit.Position
+			if shrineStuckStartTime.IsZero() {
+				shrineStuckStartTime = time.Now()
+				shrineStuckReferencePosition = currentPosition
+			} else {
+				distanceMoved := calculateDistance(currentPosition, shrineStuckReferencePosition)
+				if distanceMoved > shrineMovementThreshold {
+					shrineStuckStartTime = time.Time{}
+				} else if time.Since(shrineStuckStartTime) > shrineStuckThreshold {
+					ctx.Logger.Warn(fmt.Sprintf("Bot appears to be stuck at shrine destination for %v. Forcing interaction.", shrineStuckThreshold))
+					shrineFound := false
+					var shrineObject data.Object
+					for _, o := range ctx.Data.Objects {
+						if o.Position == shrineDestination {
+							shrineObject = o
+							shrineFound = true
+							break
+						}
+					}
+					if shrineFound {
+						if err := interactWithShrine(&shrineObject); err != nil {
+							ctx.Logger.Warn("Failed to interact with shrine after being stuck", slog.Any("error", err))
+						}
+					} else {
+						ctx.Logger.Warn("Stuck at a location that was supposed to be a shrine, but no shrine object was found. Clearing shrine destination.")
+					}
+					shrineDestination = data.Position{}
+					shrineStuckStartTime = time.Time{}
+					continue
+				}
 			}
+		} else {
+			shrineStuckStartTime = time.Time{}
+		}
 
+		if !ctx.Data.CanTeleport() {
 			if time.Since(lastRun) < walkDuration {
 				time.Sleep(walkDuration - time.Since(lastRun))
 				continue
@@ -217,34 +323,6 @@ func MoveTo(dest data.Position, options ...MoveOption) error {
 			if time.Since(lastRun) < ctx.Data.PlayerCastDuration() {
 				time.Sleep(ctx.Data.PlayerCastDuration() - time.Since(lastRun))
 				continue
-			}
-		}
-
-		if !ctx.Data.AreaData.Area.IsTown() && !ctx.Data.CanTeleport() && time.Since(stepLastMonsterCheck) > stepMonsterCheckInterval {
-			stepLastMonsterCheck = time.Now()
-
-			monsterFound := false
-			clearPathDist := ctx.CharacterCfg.Character.ClearPathDist
-
-			for _, m := range ctx.Data.Monsters.Enemies() {
-				if m.Stats[stat.Life] <= 0 {
-					continue
-				}
-
-				distanceToMonster := ctx.PathFinder.DistanceFromMe(m.Position)
-				if distanceToMonster <= clearPathDist {
-					if ctx.PathFinder.LineOfSight(ctx.Data.PlayerUnit.Position, m.Position) {
-						ctx.Logger.Debug(fmt.Sprintf("MoveTo: Monster detected in path with clear line of sight. Name: %s, Distance: %d", m.Name, distanceToMonster))
-						monsterFound = true
-						break
-					} else {
-						ctx.Logger.Debug(fmt.Sprintf("MoveTo: Monster detected in path, but there is no clear line of sight. Name: %s, Distance: %d", m.Name, distanceToMonster))
-					}
-				}
-			}
-
-			if monsterFound {
-				return ErrMonstersInPath
 			}
 		}
 
@@ -305,16 +383,22 @@ func MoveTo(dest data.Position, options ...MoveOption) error {
 				shrineDestination = data.Position{}
 				continue
 			}
+			if currentDest == obstacleDestination {
+				ctx.Logger.Warn(fmt.Sprintf("Path to obstacle at %v could not be calculated. Clearing obstacle destination.", currentDest))
+				obstacleDestination = data.Position{}
+				obstacleObject = nil
+				continue
+			}
 			if opts.stationaryMinDistance == nil || opts.stationaryMaxDistance == nil ||
-				currentDistanceToDest < *opts.stationaryMinDistance || currentDistanceToDest > *opts.stationaryMaxDistance {
-				if ctx.PathFinder.DistanceFromMe(currentDest) < minDistanceToFinishMoving+5 {
+				currentDistanceToDest < float64(*opts.stationaryMinDistance) || currentDistanceToDest > float64(*opts.stationaryMaxDistance) {
+				if float64(ctx.PathFinder.DistanceFromMe(currentDest)) < float64(minDistanceToFinishMoving+5) {
 					return nil
 				}
 				return errors.New("path could not be calculated. Current area: [" + ctx.Data.PlayerUnit.Area.Area().Name + "]. Trying to path to Destination: [" + fmt.Sprintf("%d,%d", currentDest.X, currentDest.Y) + "]")
 			}
 			return nil
 		}
-		if distance <= minDistanceToFinishMoving || len(path) <= minDistanceToFinishMoving || len(path) == 0 {
+		if float64(distance) <= float64(minDistanceToFinishMoving) || len(path) <= minDistanceToFinishMoving || len(path) == 0 {
 			if currentDest == dest {
 				return nil
 			}
@@ -330,7 +414,7 @@ func MoveTo(dest data.Position, options ...MoveOption) error {
 
 		lastRun = time.Now()
 
-		if distance < 20 && math.Abs(float64(previousDistance-distance)) < DistanceToFinishMoving {
+		if distance < 20 && math.Abs(float64(previousDistance-distance)) < float64(DistanceToFinishMoving) {
 			minDistanceToFinishMoving += DistanceToFinishMoving
 		} else if opts.distanceOverride != nil {
 			minDistanceToFinishMoving = *opts.distanceOverride
@@ -342,6 +426,131 @@ func MoveTo(dest data.Position, options ...MoveOption) error {
 		previousDistance = distance
 		ctx.PathFinder.MoveThroughPath(path, walkDuration)
 	}
+}
+
+// handleImmediateObstacles checks for doors or breakable objects in the immediate vicinity and returns the closest one.
+func handleImmediateObstacles() (*data.Object, bool) {
+	ctx := context.Get()
+	breakableObjects := []object.Name{
+		object.Barrel, object.Urn2, object.Urn3, object.Casket,
+		object.Casket5, object.Casket6, object.LargeUrn1, object.LargeUrn4,
+		object.LargeUrn5, object.Crate, object.HollowLog, object.Sarcophagus,
+	}
+
+	const immediateVicinity = 5.0
+	var closestObject *data.Object
+	minDistance := math.MaxFloat64
+
+	// First, check for breakable objects
+	for _, o := range ctx.Data.Objects {
+		for _, breakableName := range breakableObjects {
+			if o.Name == breakableName && o.Selectable {
+				ourPos := ctx.Data.PlayerUnit.Position
+				distanceToObj := calculateDistance(ourPos, o.Position)
+				if distanceToObj < immediateVicinity && distanceToObj < minDistance {
+					minDistance = distanceToObj
+					closestObject = &o
+				}
+			}
+		}
+	}
+
+	// Then, check for doors. If a closer door is found, prioritize it.
+	for _, o := range ctx.Data.Objects {
+		if o.IsDoor() && o.Selectable {
+			ourPos := ctx.Data.PlayerUnit.Position
+			distanceToDoor := calculateDistance(ourPos, o.Position)
+			if distanceToDoor < immediateVicinity && distanceToDoor < minDistance {
+				minDistance = distanceToDoor
+				closestObject = &o
+			}
+		}
+	}
+
+	if closestObject != nil {
+		ctx.Logger.Debug(fmt.Sprintf("Immediate obstacle found: %s at %s. Prioritizing it.", closestObject.Desc().Name, closestObject.Position))
+		return closestObject, true
+	}
+
+	return nil, false
+}
+
+// InteractWithObject handles the interaction logic for a given object (e.g., a breakable urn)
+func InteractWithObject(o data.Object) error {
+	ctx := context.Get()
+
+	// Global cooldown check to avoid spamming interaction attempts
+	if time.Since(lastDestructibleAttemptTime) < objectInteractionCooldown {
+		return nil // Return gracefully if on cooldown
+	}
+
+	lastDestructibleAttemptTime = time.Now()
+	
+	attempts := 0
+	maxAttempts := 5
+
+	for {
+		ctx.RefreshGameData()
+		_, found := ctx.Data.Objects.FindByID(o.ID)
+
+		if !found {
+			ctx.Logger.Debug("Object successfully destroyed.")
+			return nil
+		}
+
+		if attempts >= maxAttempts {
+			ctx.Logger.Warn(fmt.Sprintf("Failed to destroy object [%s] after multiple attempts. Moving on.", o.Desc().Name))
+			return fmt.Errorf("failed to destroy object [%s] after multiple attempts", o.Desc().Name)
+		}
+
+		x, y := ui.GameCoordsToScreenCords(o.Position.X, o.Position.Y)
+		ctx.HID.Click(game.LeftButton, x, y)
+		attempts++
+		utils.Sleep(100)
+	}
+}
+
+func isBreakable(name object.Name) bool {
+	breakableObjects := []object.Name{
+		object.Barrel, object.Urn2, object.Urn3, object.Casket,
+		object.Casket5, object.Casket6, object.LargeUrn1, object.LargeUrn4,
+		object.LargeUrn5, object.Crate, object.HollowLog, object.Sarcophagus,
+	}
+	for _, n := range breakableObjects {
+		if n == name {
+			return true
+		}
+	}
+	return false
+}
+
+// handleDoorsInPath manages interactions with doors in the bot's path.
+func handleDoorsInPath(dest data.Position, openedDoors map[object.Name]data.Position) (data.Position, *data.Object, error) {
+	ctx := context.Get()
+
+	var closestDoorInPath *data.Object
+	minDistance := math.MaxFloat64
+
+	for _, o := range ctx.Data.Objects {
+		if o.IsDoor() && o.Selectable {
+			doorPos := o.Position
+			ourPos := ctx.Data.PlayerUnit.Position
+			threshhold := 5.0
+			if isObjectInPath(dest, ourPos, doorPos, threshhold) {
+				distance := float64(ctx.PathFinder.DistanceFromMe(doorPos))
+				if distance < minDistance {
+					minDistance = distance
+					closestDoorInPath = &o
+				}
+			}
+		}
+	}
+
+	if closestDoorInPath != nil {
+		ctx.Logger.Debug("Door detected in path, setting as new destination.")
+		return closestDoorInPath.Position, closestDoorInPath, nil
+	}
+	return data.Position{}, nil, nil
 }
 
 func isObjectInPath(dest data.Position, player data.Position, object data.Position, tolerance float64) bool {
@@ -380,63 +589,44 @@ func isObjectInPath(dest data.Position, player data.Position, object data.Positi
 	}
 }
 
-func handleObstaclesInPath(dest data.Position, openedDoors map[object.Name]data.Position) bool {
+func findClosestMonsterInPath(dest data.Position) (*data.Monster, bool) {
 	ctx := context.Get()
 
+	isGoingToPortal := false
 	for _, o := range ctx.Data.Objects {
-		if o.IsDoor() && o.Selectable &&
-			ctx.PathFinder.DistanceFromMe(o.Position) < 8 &&
-			openedDoors[o.Name] != o.Position {
+		if o.Name == object.TownPortal && o.Position == dest {
+			isGoingToPortal = true
+			break
+		}
+	}
+	if ctx.Data.PlayerUnit.Area.IsTown() || isGoingToPortal {
+		return nil, false
+	}
 
-			doorPos := o.Position
-			ourPos := ctx.Data.PlayerUnit.Position
+	hostileMonsters := ctx.Data.Monsters.Enemies(data.MonsterAnyFilter())
 
-			threshhold := 8.0
+	var closestMonster *data.Monster
+	var minDistance float64 = math.MaxFloat64
 
-			if isObjectInPath(dest, ourPos, doorPos, threshhold) {
-				ctx.Logger.Debug("Door detected in path, opening it...")
-				openedDoors[o.Name] = o.Position
-
-				err := InteractObject(o, func() bool {
-					obj, found := ctx.Data.Objects.FindByID(o.ID)
-					return found && !obj.Selectable
-				})
-
-				if err != nil {
-					ctx.Logger.Debug("Failed to open door", slog.String("error", err.Error()))
-				} else {
-					return true
+	for _, m := range hostileMonsters {
+		monsterDistance := float64(ctx.PathFinder.DistanceFromMe(m.Position))
+		if monsterDistance < float64(ctx.CharacterCfg.Character.ClearPathDist) && !ctx.Data.CanTeleport() {
+			if ctx.PathFinder.LineOfSight(ctx.Data.PlayerUnit.Position, m.Position) {
+				if monsterDistance < minDistance {
+					minDistance = monsterDistance
+					closestMonster = &m
 				}
+			} else {
+				ctx.Logger.Debug(fmt.Sprintf("Monster [%v] is nearby but no line of sight, continuing movement.", m.Name))
 			}
 		}
 	}
 
-	for _, o := range ctx.Data.Objects {
-		if o.Name == object.Barrel && ctx.PathFinder.DistanceFromMe(o.Position) < 3 {
-			objPos := o.Position
-			ourPos := ctx.Data.PlayerUnit.Position
-
-			dotProduct := (objPos.X-ourPos.X)*(dest.X-ourPos.X) + (objPos.Y-ourPos.Y)*(dest.Y-ourPos.Y)
-			lengthSquared := (dest.X-ourPos.X)*(dest.X-ourPos.X) + (dest.Y-ourPos.Y)*(dest.Y-ourPos.Y)
-
-			if lengthSquared > 0 && dotProduct > 0 && dotProduct < lengthSquared {
-				ctx.Logger.Debug("Destructible object in path, destroying it...")
-            
-				err := InteractObject(o, func() bool {
-					ctx.RefreshGameData()
-				_, found := ctx.Data.Objects.FindByID(o.ID)
-					return !found
-				})
-
-				if err != nil {
-					ctx.Logger.Debug("Failed to destroy barrel", slog.String("error", err.Error()))
-				} else {
-					return true
-				}
-			}
-		}
+	if closestMonster != nil {
+		return closestMonster, true
 	}
-	return false
+
+	return nil, false
 }
 
 func findClosestShrine() *data.Object {
@@ -474,7 +664,7 @@ func findClosestShrine() *data.Object {
 	for _, o := range ctx.Data.Objects {
 		if o.IsShrine() && o.Selectable {
 			for _, sType := range alwaysTakeShrines {
-				if o.Shrine.ShrineType == sType {
+				if sType == o.Shrine.ShrineType {
 					if sType == object.HealthShrine && ctx.Data.PlayerUnit.HPPercent() > 95 {
 						continue
 					}
@@ -506,6 +696,7 @@ func findClosestShrine() *data.Object {
 			currentPriorityIndex = i
 			break
 		}
+		
 	}
 
 	for _, o := range ctx.Data.Objects {
