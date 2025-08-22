@@ -91,6 +91,14 @@ func InteractEntrance(area area.ID) error {
 					ctx.HID.MovePointer(lx+x, ly+y)
 					interactionAttempts++
 					utils.Sleep(100)
+					
+							
+					//Add a random movement logic when interaction attempts fail
+					if interactionAttempts > 1 && interactionAttempts%3 == 0 {
+					ctx.Logger.Debug("Failed to interact with entrance, performing random movement to reset position.")
+					ctx.PathFinder.RandomMovement()
+					utils.Sleep(1000)
+					}
 
 					lastEntranceLevel = l
 
