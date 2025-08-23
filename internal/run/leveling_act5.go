@@ -3,11 +3,11 @@ package run
 import (
 	"fmt"
 
-		"github.com/hectorgimenez/koolo/internal/action/step"
+	"github.com/hectorgimenez/koolo/internal/action/step"
 
-		"github.com/hectorgimenez/koolo/internal/game"
-		"github.com/hectorgimenez/koolo/internal/utils"
-		"github.com/hectorgimenez/koolo/internal/ui"
+	"github.com/hectorgimenez/koolo/internal/game"
+	"github.com/hectorgimenez/koolo/internal/ui"
+	"github.com/hectorgimenez/koolo/internal/utils"
 
 	"github.com/hectorgimenez/d2go/pkg/data"
 	"github.com/hectorgimenez/d2go/pkg/data/area"
@@ -18,31 +18,26 @@ import (
 	"github.com/hectorgimenez/d2go/pkg/data/stat"
 	"github.com/hectorgimenez/koolo/internal/action"
 	"github.com/hectorgimenez/koolo/internal/config" // Make sure this import is present
-	//	"github.com/lxn/win" 
-	
+	//	"github.com/lxn/win"
 )
-
-
 
 func (a Leveling) act5() error {
 	if a.ctx.Data.PlayerUnit.Area != area.Harrogath {
 		return nil
 	}
-	
-	
 
+	action.VendorRefill(true, true)
 
-action.VendorRefill(true, true);
-	
-// Gold Farming Logic (and immediate return if farming is needed)
-    if (a.ctx.CharacterCfg.Game.Difficulty == difficulty.Normal && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 30000) ||
-        (a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 50000) ||
-        (a.ctx.CharacterCfg.Game.Difficulty == difficulty.Hell && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 70000) {
+	// Gold Farming Logic (and immediate return if farming is needed)
+	if (a.ctx.CharacterCfg.Game.Difficulty == difficulty.Normal && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 30000) ||
+		(a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 50000) ||
+		(a.ctx.CharacterCfg.Game.Difficulty == difficulty.Hell && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 70000) {
 
-        a.ctx.Logger.Info("Low on gold. Initiating Kurast Chest gold farm.")
-         return NewLowerKurastChest().Run()
-    }
-    // If we reach this point, it means gold is sufficient, and we skip farming for this run.
+		a.ctx.Logger.Info("Low on gold. Initiating Kurast Chest gold farm.")
+		NewLowerKurastChest().Run()
+		return action.WayPoint(area.Harrogath)
+	}
+	// If we reach this point, it means gold is sufficient, and we skip farming for this run.
 
 	lvl, _ := a.ctx.Data.PlayerUnit.FindStat(stat.Level, 0)
 
@@ -51,9 +46,9 @@ action.VendorRefill(true, true);
 
 	// Logic for Act5EveOfDestruction quest completion
 	if a.ctx.Data.Quests[quest.Act5EveOfDestruction].Completed() {
-		
-	a.ctx.Logger.Info("Eve of Destruction completed")	
-		
+
+		a.ctx.Logger.Info("Eve of Destruction completed")
+
 		currentDifficulty := a.ctx.CharacterCfg.Game.Difficulty
 		switch currentDifficulty {
 		case difficulty.Normal:
@@ -92,9 +87,7 @@ action.VendorRefill(true, true);
 		}
 	}
 
-
-
-	if  (a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && lvl.Value < 60) {
+	if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && lvl.Value < 60 {
 
 		diabloRun := NewDiablo()
 		err := diabloRun.Run()
@@ -102,9 +95,6 @@ action.VendorRefill(true, true);
 			return err
 		}
 	}
-
-
-		
 
 	// Logic for Act5RiteOfPassage quest completion
 	if a.ctx.Data.Quests[quest.Act5RiteOfPassage].Completed() && a.ctx.Data.Quests[quest.Act5PrisonOfIce].Completed() {
@@ -114,7 +104,6 @@ action.VendorRefill(true, true);
 		}
 		NewBaal(nil).Run()
 
-	
 		return nil
 	}
 
@@ -162,21 +151,20 @@ action.VendorRefill(true, true);
 		step.CloseAllMenus() // Close inventory after attempt
 	}
 
+	/*	if lvl, _ := a.ctx.Data.PlayerUnit.FindStat(stat.Level, 0); lvl.Value < 35 && a.ctx.Data.CharacterCfg.Game.Difficulty == difficulty.Normal {
+			return NewPindleskin().Run()
 
-/*	if lvl, _ := a.ctx.Data.PlayerUnit.FindStat(stat.Level, 0); lvl.Value < 35 && a.ctx.Data.CharacterCfg.Game.Difficulty == difficulty.Normal {
-		return NewPindleskin().Run()
-		
-		
-	}
 
-	if lvl, _ := a.ctx.Data.PlayerUnit.FindStat(stat.Level, 0); lvl.Value < 60 && a.ctx.Data.CharacterCfg.Game.Difficulty == difficulty.Nightmare {
-		return NewPindleskin().Run()
-	}
+		}
 
-	if lvl, _ := a.ctx.Data.PlayerUnit.FindStat(stat.Level, 0); lvl.Value < 80 && a.ctx.Data.CharacterCfg.Game.Difficulty == difficulty.Hell {
-		return NewPindleskin().Run()
-	}
-*/
+		if lvl, _ := a.ctx.Data.PlayerUnit.FindStat(stat.Level, 0); lvl.Value < 60 && a.ctx.Data.CharacterCfg.Game.Difficulty == difficulty.Nightmare {
+			return NewPindleskin().Run()
+		}
+
+		if lvl, _ := a.ctx.Data.PlayerUnit.FindStat(stat.Level, 0); lvl.Value < 80 && a.ctx.Data.CharacterCfg.Game.Difficulty == difficulty.Hell {
+			return NewPindleskin().Run()
+		}
+	*/
 	err := NewQuests().killAncientsQuest()
 	if err != nil {
 		return err
@@ -185,27 +173,22 @@ action.VendorRefill(true, true);
 	return nil
 }
 
-
-
-
 func (a Leveling) FrigidHighlands() error {
 	a.ctx.Logger.Info("Entering BloodyFoothills for gold farming...")
 
 	err := action.WayPoint(area.FrigidHighlands)
 	if err != nil {
 		a.ctx.Logger.Error("Failed to move to Frigid Highlands area: %v", err)
-		return err 
+		return err
 	}
 	a.ctx.Logger.Info("Successfully reached Frigid Highlands.")
 
 	err = action.ClearCurrentLevel(false, data.MonsterAnyFilter())
 	if err != nil {
 		a.ctx.Logger.Error("Failed to clear Frigid Highlands area: %v", err)
-		return err 
+		return err
 	}
 	a.ctx.Logger.Info("Successfully cleared Frigid Highlands area.")
 
-	return nil 
+	return nil
 }
-
-
