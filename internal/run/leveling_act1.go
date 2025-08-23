@@ -1,10 +1,8 @@
 package run
 
 import (
-	"errors"
 	"fmt"
 	"math"
-	"time"
 
 	"github.com/hectorgimenez/d2go/pkg/data"
 	"github.com/hectorgimenez/d2go/pkg/data/area"
@@ -17,7 +15,6 @@ import (
 	"github.com/hectorgimenez/koolo/internal/game"
 	"github.com/hectorgimenez/koolo/internal/utils"
 
-	"github.com/hectorgimenez/koolo/internal/context"
 	"github.com/lxn/win"
 )
 
@@ -41,7 +38,7 @@ func (a Leveling) act1() error {
 	if lvl.Value > 1 {
 		action.VendorRefill(true, true)
 		if err := action.EnsureSkillBindings(); err != nil {
-			a.ctx.Logger.Error("Error ensuring skill bindings after vendor refill: %s", err.Error())
+			a.ctx.Logger.Error(fmt.Sprintf("Error ensuring skill bindings after vendor refill: %s", err.Error()))
 		}
 	}
 
@@ -56,9 +53,6 @@ func (a Leveling) act1() error {
 			return NewMausoleum().Run()
 		}
 	}
-
-	// Den of Evil quest
-	//	if a.ctx.CharacterCfg.Game.Difficulty != difficulty.Hell &&  !a.ctx.Data.Quests[quest.Act1DenOfEvil].Completed() { {
 
 	if !a.ctx.Data.Quests[quest.Act1DenOfEvil].Completed() && a.ctx.CharacterCfg.Game.Difficulty != difficulty.Hell {
 		a.ctx.Logger.Debug("Completing Den of Evil")
@@ -75,12 +69,12 @@ func (a Leveling) act1() error {
 		return a.killRavenGetMerc()
 	}
 
-	if a.ctx.CharacterCfg.Character.UseMerc == false && a.ctx.Data.Quests[quest.Act1SistersBurialGrounds].Completed() {
+	if !a.ctx.CharacterCfg.Character.UseMerc && a.ctx.Data.Quests[quest.Act1SistersBurialGrounds].Completed() {
 		a.ctx.CharacterCfg.Character.UseMerc = true
 
 		action.InteractNPC(npc.Kashya)
 		if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
-			a.ctx.Logger.Error("Failed to save character configuration: %s", err.Error())
+			a.ctx.Logger.Error(fmt.Sprintf("Failed to save character configuration: %s", err.Error()))
 
 		}
 	}
@@ -95,15 +89,11 @@ func (a Leveling) act1() error {
 		return NewTristramEarlyGoldfarm().Run()
 	}
 
-	/*	if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Normal && lvl.Value < 6 {
-		return NewTristramEarlyGoldfarm().Run()
-	}*/
-
 	// Cain quest: talking to Akara
 	if !a.isCainInTown() && !a.ctx.Data.Quests[quest.Act1TheSearchForCain].Completed() {
 		a.ctx.CharacterCfg.Character.ClearPathDist = 7
 		if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
-			a.ctx.Logger.Error("Failed to save character configuration: %s", err.Error())
+			a.ctx.Logger.Error(fmt.Sprintf("Failed to save character configuration: %s", err.Error()))
 		}
 		return NewQuests().rescueCainQuest()
 	}
@@ -113,7 +103,7 @@ func (a Leveling) act1() error {
 
 		a.ctx.CharacterCfg.Character.ClearPathDist = 4
 		if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
-			a.ctx.Logger.Error("Failed to save character configuration: %s", err.Error())
+			a.ctx.Logger.Error(fmt.Sprintf("Failed to save character configuration: %s", err.Error()))
 		}
 
 		if lvl.Value < 12 {
@@ -137,12 +127,11 @@ func (a Leveling) act1() error {
 		a.ctx.CharacterCfg.Character.ClearPathDist = 7
 		a.ctx.CharacterCfg.Inventory.BeltColumns = [4]string{"healing", "healing", "mana", "mana"}
 		if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
-			a.ctx.Logger.Error("Failed to save character configuration: %s", err.Error())
+			a.ctx.Logger.Error(fmt.Sprintf("Failed to save character configuration: %s", err.Error()))
 
 		}
 		return NewAndariel().Run()
 	}
-	return nil
 }
 
 // setupLevelOneConfig centralizes the configuration logic for a new character.
@@ -192,7 +181,7 @@ func (a Leveling) setupLevelOneConfig() {
 		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 	}
 	if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
-		a.ctx.Logger.Error("Failed to save character configuration: %s", err.Error())
+		a.ctx.Logger.Error(fmt.Sprintf("Failed to save character configuration: %s", err.Error()))
 	}
 }
 
@@ -230,7 +219,7 @@ func (a Leveling) AdjustDifficultyConfig() {
 
 		}
 		if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
-			a.ctx.Logger.Error("Failed to save character configuration: %s", err.Error())
+			a.ctx.Logger.Error(fmt.Sprintf("Failed to save character configuration: %s", err.Error()))
 		}
 	}
 }
@@ -261,15 +250,6 @@ func (a Leveling) goToAct2() error {
 	return nil
 }
 
-// coldPlains handles clearing Cold Plains
-func (a Leveling) coldPlains() error {
-	err := action.WayPoint(area.ColdPlains)
-	if err != nil {
-		return err
-	}
-	return action.ClearCurrentLevel(false, data.MonsterAnyFilter())
-}
-
 // stonyField handles clearing Stony Field
 func (a Leveling) stonyField() error {
 	err := action.WayPoint(area.StonyField)
@@ -290,117 +270,47 @@ func (a Leveling) killRavenGetMerc() error {
 	ctx := a.ctx
 	ctx.SetLastAction("killRavenGetMerc")
 
-	// Use a timeout for the entire process to prevent infinite loops
-	timeout := time.Now().Add(5 * time.Minute)
-
-	// Step 1: Use the waypoint to travel to Cold Plains and then move to Burial Grounds.
-	if ctx.Data.PlayerUnit.Area != area.BurialGrounds {
-		err := action.WayPoint(area.ColdPlains)
-		if err != nil {
-			return fmt.Errorf("failed to move to Cold Plains: %w", err)
-		}
-		if err = action.MoveToArea(area.BurialGrounds); err != nil {
-			return fmt.Errorf("failed to move to Burial Grounds: %w", err)
-		}
+	if err := action.WayPoint(area.ColdPlains); err != nil {
+		return fmt.Errorf("failed to move to Cold Plains: %w", err)
 	}
 
-	// Step 2: Loop to find and kill Blood Raven, or until timeout.
-	for time.Now().Before(timeout) {
-		bloodRaven, found := ctx.Data.Monsters.FindOne(npc.BloodRaven, data.MonsterTypeNone)
+	if err := action.MoveToArea(area.BurialGrounds); err != nil {
+		return fmt.Errorf("failed to move to Burial Grounds: %w", err)
+	}
 
-		// If Blood Raven is found and her health is 0, she's dead. We can break the loop.
-		if found && bloodRaven.Stats[stat.Life] <= 0 {
-			ctx.Logger.Info("Blood Raven is confirmed dead. Returning to town.")
+	originalBackToTownCfg := a.ctx.CharacterCfg.BackToTown
+	a.ctx.CharacterCfg.BackToTown.NoMpPotions = false
+	a.ctx.CharacterCfg.Health.HealingPotionAt = 55
+
+	defer func() {
+		a.ctx.CharacterCfg.BackToTown = originalBackToTownCfg
+		a.ctx.Logger.Info("Restored original back-to-town checks after Blood Raven fight.")
+	}()
+
+	areaData := a.ctx.Data.Areas[area.BurialGrounds]
+	bloodRavenNPC, found := areaData.NPCs.FindOne(805)
+
+	if !found || len(bloodRavenNPC.Positions) == 0 {
+		a.ctx.Logger.Info("Blood Raven position not found")
+		return nil
+	}
+
+	action.MoveToCoords(bloodRavenNPC.Positions[0])
+
+	for {
+		bloodRaven, found := a.ctx.Data.Monsters.FindOne(npc.BloodRaven, data.MonsterTypeNone)
+
+		if !found {
 			break
 		}
 
-		originalBackToTownCfg := a.ctx.CharacterCfg.BackToTown
-
-		a.ctx.CharacterCfg.BackToTown.NoMpPotions = false
-		a.ctx.CharacterCfg.Health.HealingPotionAt = 55
-
-		defer func() {
-			a.ctx.CharacterCfg.BackToTown = originalBackToTownCfg
-			a.ctx.Logger.Info("Restored original back-to-town checks after Mephisto fight.")
-		}()
-
-		// If she's not found, try to move to a good position to force the area to load
-		// and reveal her.
-		if !found {
-			mausoleumEntranceLvl, entranceFound := findMausoleumEntrance(ctx)
-			if entranceFound {
-				targetPos := atDistance(mausoleumEntranceLvl.Position, ctx.Data.PlayerUnit.Position, 15)
-				if err := action.MoveToCoords(targetPos); err != nil {
-					return fmt.Errorf("failed to move to position near Mausoleum entrance: %w", err)
-				}
-				ctx.Logger.Info("Moved to a strategic position to search for Blood Raven.")
-			} else {
-				// If the entrance isn't found, clear the area to force load
-				ctx.Logger.Info("Mausoleum entrance not found. Clearing area to reveal Blood Raven.")
-				if err := action.ClearCurrentLevel(false, data.MonsterAnyFilter()); err != nil {
-					ctx.Logger.Warn("Failed to clear area: %s", err.Error())
-				}
-			}
-			time.Sleep(1 * time.Second)
-			continue
-		}
-
-		// If she is found and alive, engage her.
-		ctx.Logger.Info("Blood Raven found, engaging.")
-		if err := a.killBloodRaven(bloodRaven); err != nil {
-			ctx.Logger.Warn("Failed to kill Blood Raven: %s. Retrying...", err.Error())
-			time.Sleep(1 * time.Second)
-			continue
-		}
-
-		time.Sleep(500 * time.Millisecond)
-	}
-
-	// If the loop timed out, return an error.
-	if time.Now().After(timeout) {
-		return errors.New("Blood Raven quest failed to complete within the timeout period")
-	}
-
-	return nil
-}
-
-// A helper function to encapsulate the fallback logic.
-func (a Leveling) fallbackClear() error {
-	err := action.ClearCurrentLevel(false, data.MonsterAnyFilter())
-	if err != nil {
-		return fmt.Errorf("failed to clear Burial Grounds (fallback): %w", err)
-	}
-
-	return nil
-}
-
-// A helper function to encapsulate the kill logic, without quest checks.
-func (a Leveling) killBloodRaven(bloodRaven data.Monster) error {
-	ctx := a.ctx
-	err := ctx.Char.KillMonsterSequence(func(d game.Data) (data.UnitID, bool) {
-		m, monsterFound := d.Monsters.FindByID(bloodRaven.UnitID)
-		if monsterFound && m.Stats[stat.Life] > 0 {
+		a.ctx.Char.KillMonsterSequence(func(d game.Data) (data.UnitID, bool) {
 			return bloodRaven.UnitID, true
-		}
-		return 0, false
-	}, nil)
-
-	if err != nil {
-		return fmt.Errorf("failed to kill Blood Raven: %w", err)
+		}, nil)
 	}
 
 	return nil
 }
-
-/* A helper function to encapsulate the quest completion logic.
-func (a Leveling) completeQuest() error {
-	action.ReturnTown()
-	err := action.InteractNPC(npc.Kashya)
-	if err != nil {
-		return fmt.Errorf("failed to interact with Kashya: %w", err)
-	}
-	return nil
-}*/
 
 // atDistance is a helper function to calculate a position a certain distance away from a target.
 func atDistance(start, end data.Position, distance int) data.Position {
@@ -417,14 +327,4 @@ func atDistance(start, end data.Position, distance int) data.Position {
 	newY := float64(start.Y) + dy*ratio
 
 	return data.Position{X: int(newX), Y: int(newY)}
-}
-
-// A helper to simplify the main function
-func findMausoleumEntrance(ctx *context.Status) (data.Level, bool) {
-	for _, adjLvl := range ctx.Data.AdjacentLevels {
-		if adjLvl.Area == area.Mausoleum {
-			return adjLvl, true
-		}
-	}
-	return data.Level{}, false
 }
