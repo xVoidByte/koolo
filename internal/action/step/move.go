@@ -26,6 +26,7 @@ var (
 	stepMonsterCheckInterval    = 100 * time.Millisecond
 	lastDestructibleAttemptTime = time.Time{}
 	objectInteractionCooldown   = 500 * time.Millisecond
+	failedToPathToShrine = make(map[data.Position]time.Time)
 )
 
 var alwaysTakeShrines = []object.ShrineType{
@@ -135,7 +136,6 @@ func MoveTo(dest data.Position, options ...MoveOption) error {
 	longTermIdleStartTime := time.Time{}
 	const longTermIdleThreshold = 2 * time.Minute
 	const minMovementThreshold = 30
-	failedToPathToShrine := make(map[data.Position]time.Time)
 	var shrineDestination data.Position
 
 	for {
