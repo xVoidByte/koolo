@@ -39,13 +39,8 @@ action.VendorRefill(true, true);
         (a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 50000) ||
         (a.ctx.CharacterCfg.Game.Difficulty == difficulty.Hell && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 70000) {
 
-        a.ctx.Logger.Info("Low on gold. Initiating Frigid Highlands gold farm.")
-        if err := a.FrigidHighlands(); err != nil {
-            a.ctx.Logger.Error("Error during Bloody Foothills gold farm: %v", err)
-            return err // Propagate error if farming fails
-        }
-        a.ctx.Logger.Info("Gold farming completed. Quitting current run to re-evaluate in next game.")
-        return nil // Key: This immediately exits the 'act5' function, ending the current game run.
+        a.ctx.Logger.Info("Low on gold. Initiating Kurast Chest gold farm.")
+         return NewLowerKurastChest().Run()
     }
     // If we reach this point, it means gold is sufficient, and we skip farming for this run.
 
