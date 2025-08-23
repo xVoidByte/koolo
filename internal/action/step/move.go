@@ -58,9 +58,9 @@ var curseBreakingShrines = []object.ShrineType{
 }
 
 type MoveOpts struct {
-	distanceOverride       *int
-	stationaryMinDistance  *int
-	stationaryMaxDistance  *int
+	distanceOverride      *int
+	stationaryMinDistance *int
+	stationaryMaxDistance *int
 	ignoreShrines         bool
 }
 
@@ -327,7 +327,7 @@ func MoveTo(dest data.Position, options ...MoveOption) error {
 				ctx.Logger.Warn(fmt.Sprintf("Path to shrine at %v could not be calculated. Marking shrine as unreachable for a few minutes.", currentDest))
 				failedToPathToShrine[shrineDestination] = time.Now()
 				shrineDestination = data.Position{}
-				continue
+				return nil
 			}
 			if opts.stationaryMinDistance == nil || opts.stationaryMaxDistance == nil ||
 				currentDistanceToDest < *opts.stationaryMinDistance || currentDistanceToDest > *opts.stationaryMaxDistance {
