@@ -86,7 +86,7 @@ func (a Leveling) act1() error {
 	}
 
 	// Cain quest: entering Tristram
-	if a.ctx.Data.Quests[quest.Act1TheSearchForCain].HasStatus(quest.StatusInProgress2) || a.ctx.Data.Quests[quest.Act1TheSearchForCain].HasStatus(quest.StatusInProgress3) || a.ctx.Data.Quests[quest.Act1TheSearchForCain].HasStatus(quest.StatusInProgress4) {
+	if (a.ctx.Data.Quests[quest.Act1TheSearchForCain].HasStatus(quest.StatusInProgress2) || a.ctx.Data.Quests[quest.Act1TheSearchForCain].HasStatus(quest.StatusInProgress3) || a.ctx.Data.Quests[quest.Act1TheSearchForCain].HasStatus(quest.StatusInProgress4)) && a.ctx.CharacterCfg.Game.Difficulty != difficulty.Hell {
 		return NewTristram().Run()
 	}
 
@@ -100,7 +100,7 @@ func (a Leveling) act1() error {
 	}*/
 
 	// Cain quest: talking to Akara
-	if !a.isCainInTown() && !a.ctx.Data.Quests[quest.Act1TheSearchForCain].Completed() {
+	if !a.isCainInTown() && !a.ctx.Data.Quests[quest.Act1TheSearchForCain].Completed() && a.ctx.CharacterCfg.Game.Difficulty != difficulty.Hell {
 		a.ctx.CharacterCfg.Character.ClearPathDist = 7
 		if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
 			a.ctx.Logger.Error("Failed to save character configuration: %s", err.Error())
@@ -241,13 +241,13 @@ func (a Leveling) goToAct2() error {
 	action.ReturnTown()
 
 	// Do Den of Evil if not complete before moving acts
-	if !a.ctx.Data.Quests[quest.Act1DenOfEvil].Completed() {
+	if !a.ctx.Data.Quests[quest.Act1DenOfEvil].Completed() && a.ctx.CharacterCfg.Game.Difficulty != difficulty.Hell {
 		if err := NewQuests().clearDenQuest(); err != nil {
 			return err
 		}
 	}
 	// Rescue Cain if not already done
-	if !a.isCainInTown() {
+	if !a.isCainInTown() && a.ctx.CharacterCfg.Game.Difficulty != difficulty.Hell {
 		if err := NewQuests().rescueCainQuest(); err != nil {
 			return err
 		}
