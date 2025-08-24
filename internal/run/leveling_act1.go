@@ -215,9 +215,9 @@ func (a Leveling) AdjustDifficultyConfig() {
 			a.ctx.CharacterCfg.Inventory.BeltColumns = [4]string{"healing", "healing", "mana", "rejuvenation"}
 			a.ctx.CharacterCfg.Health.MercHealingPotionAt = 80
 			a.ctx.CharacterCfg.Health.MercRejuvPotionAt = 40
-			a.ctx.CharacterCfg.Health.MercHealingPotionAt = 80
 			a.ctx.CharacterCfg.Health.HealingPotionAt = 90
-			a.ctx.CharacterCfg.Health.ChickenAt = 0
+			a.ctx.CharacterCfg.Health.ChickenAt = 40
+			a.ctx.CharacterCfg.Character.ClearPathDist = 0
 
 		}
 		if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
