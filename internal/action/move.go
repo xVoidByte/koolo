@@ -175,7 +175,17 @@ func MoveToArea(dst area.ID) error {
 		return lvl.Position, true
 	}
 
-	err := MoveTo(toFun)
+	var err error
+
+	if dst == area.HaremLevel1 && ctx.Data.PlayerUnit.Area == area.LutGholein {
+		// Because of the size of the entranc we need to stop a bit before to avoid infinite
+		// walking loop otherwise it'll never reach the exact position.
+		entrancePosition, _ := toFun()
+		err = step.MoveTo(entrancePosition, step.WithDistanceToFinish(7))
+	} else {
+		err = MoveTo(toFun)
+	}
+
 	if err != nil {
 		if errors.Is(err, health.ErrDied) { // Propagate death error
 			return err
