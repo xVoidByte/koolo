@@ -134,12 +134,14 @@ func (a Leveling) act1() error {
 	} else {
 		// Run Andariel to complete quest
 
+		if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Normal {
+
 		a.ctx.CharacterCfg.Character.ClearPathDist = 7
 		a.ctx.CharacterCfg.Inventory.BeltColumns = [4]string{"healing", "healing", "mana", "mana"}
 		if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
 			a.ctx.Logger.Error("Failed to save character configuration: %s", err.Error())
 
-		}
+		}}
 		return NewAndariel().Run()
 	}
 	return nil
