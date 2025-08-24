@@ -29,14 +29,18 @@ func (a Leveling) act5() error {
 	action.VendorRefill(true, true)
 
 	// Gold Farming Logic (and immediate return if farming is needed)
-	if (a.ctx.CharacterCfg.Game.Difficulty == difficulty.Normal && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 30000) ||
-		(a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 50000) ||
-		(a.ctx.CharacterCfg.Game.Difficulty == difficulty.Hell && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 70000) {
+    if (a.ctx.CharacterCfg.Game.Difficulty == difficulty.Normal && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 30000) ||
+        (a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 50000) ||
+        (a.ctx.CharacterCfg.Game.Difficulty == difficulty.Hell && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 70000) {
 
-		a.ctx.Logger.Info("Low on gold. Initiating Kurast Chest gold farm.")
-		NewLowerKurastChest().Run()
-		return action.WayPoint(area.Harrogath)
-	}
+        a.ctx.Logger.Info("Low on gold. Initiating Crystalline Passage gold farm.")
+        if err := a.CrystallinePassage(); err != nil {
+            a.ctx.Logger.Error("Error during Crystalline Passage gold farm: %v", err)
+            return err // Propagate error if farming fails
+        }
+        a.ctx.Logger.Info("Gold farming completed. Quitting current run to re-evaluate in next game.")
+        return nil // Key: This immediately exits the 'act5' function, ending the current game run.
+    }
 	// If we reach this point, it means gold is sufficient, and we skip farming for this run.
 
 	lvl, _ := a.ctx.Data.PlayerUnit.FindStat(stat.Level, 0)
@@ -173,22 +177,22 @@ func (a Leveling) act5() error {
 	return nil
 }
 
-func (a Leveling) FrigidHighlands() error {
-	a.ctx.Logger.Info("Entering BloodyFoothills for gold farming...")
+func (a Leveling) CrystallinePassage() error {
+	a.ctx.Logger.Info("Entering Crystalline Passage for gold farming...")
 
-	err := action.WayPoint(area.FrigidHighlands)
+	err := action.WayPoint(area.CrystallinePassage)
 	if err != nil {
-		a.ctx.Logger.Error("Failed to move to Frigid Highlands area: %v", err)
+		a.ctx.Logger.Error("Failed to move to Crystalline Passage area: %v", err)
 		return err
 	}
-	a.ctx.Logger.Info("Successfully reached Frigid Highlands.")
+	a.ctx.Logger.Info("Successfully reached Crystalline Passage.")
 
 	err = action.ClearCurrentLevel(false, data.MonsterAnyFilter())
 	if err != nil {
-		a.ctx.Logger.Error("Failed to clear Frigid Highlands area: %v", err)
+		a.ctx.Logger.Error("Failed to clear Crystalline Passage area: %v", err)
 		return err
 	}
-	a.ctx.Logger.Info("Successfully cleared Frigid Highlands area.")
+	a.ctx.Logger.Info("Successfully cleared Crystalline Passage area.")
 
 	return nil
 }
