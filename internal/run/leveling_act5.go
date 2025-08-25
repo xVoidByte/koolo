@@ -29,8 +29,8 @@ func (a Leveling) act5() error {
         (a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 50000) ||
         (a.ctx.CharacterCfg.Game.Difficulty == difficulty.Hell && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 70000) {
 
-        NewLowerKurastChest().Run()
-		return action.WayPoint(area.Harrogath)
+        NewEldritch().Run()
+		return NewQuests().killShenkQuest()
     }
 	
 
