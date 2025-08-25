@@ -113,11 +113,19 @@ func (run LowerKurastChests) Run() error {
 		return err
 	}
 
+
+    _, isLevelingChar := run.ctx.Char.(context.LevelingCharacter)
+
+    if !isLevelingChar {
+
 	// Move to A4 if possible to shorten the run time
 	err = action.WayPoint(area.ThePandemoniumFortress)
 	if err != nil {
 		return err
 	}
+   
+   
+    }
 
 	// Done
 	return nil
