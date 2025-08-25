@@ -2,13 +2,10 @@ package run
 
 import (
 	"fmt"
-
 	"github.com/hectorgimenez/koolo/internal/action/step"
-
 	"github.com/hectorgimenez/koolo/internal/game"
 	"github.com/hectorgimenez/koolo/internal/ui"
 	"github.com/hectorgimenez/koolo/internal/utils"
-
 	"github.com/hectorgimenez/d2go/pkg/data"
 	"github.com/hectorgimenez/d2go/pkg/data/area"
 	"github.com/hectorgimenez/d2go/pkg/data/difficulty"
@@ -17,8 +14,7 @@ import (
 	"github.com/hectorgimenez/d2go/pkg/data/quest"
 	"github.com/hectorgimenez/d2go/pkg/data/stat"
 	"github.com/hectorgimenez/koolo/internal/action"
-	"github.com/hectorgimenez/koolo/internal/config" // Make sure this import is present
-	//	"github.com/lxn/win"
+	"github.com/hectorgimenez/koolo/internal/config"
 )
 
 func (a Leveling) act5() error {
@@ -28,20 +24,15 @@ func (a Leveling) act5() error {
 
 	action.VendorRefill(true, true)
 
-	// Gold Farming Logic (and immediate return if farming is needed)
+	
     if (a.ctx.CharacterCfg.Game.Difficulty == difficulty.Normal && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 30000) ||
         (a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 50000) ||
         (a.ctx.CharacterCfg.Game.Difficulty == difficulty.Hell && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 70000) {
 
-        a.ctx.Logger.Info("Low on gold. Initiating Crystalline Passage gold farm.")
-        if err := a.CrystallinePassage(); err != nil {
-            a.ctx.Logger.Error("Error during Crystalline Passage gold farm: %v", err)
-            return err // Propagate error if farming fails
-        }
-        a.ctx.Logger.Info("Gold farming completed. Quitting current run to re-evaluate in next game.")
-        return nil // Key: This immediately exits the 'act5' function, ending the current game run.
+        NewLowerKurastChest().Run()
+		return action.WayPoint(area.Harrogath)
     }
-	// If we reach this point, it means gold is sufficient, and we skip farming for this run.
+	
 
 	lvl, _ := a.ctx.Data.PlayerUnit.FindStat(stat.Level, 0)
 
@@ -155,20 +146,6 @@ func (a Leveling) act5() error {
 		step.CloseAllMenus() // Close inventory after attempt
 	}
 
-	/*	if lvl, _ := a.ctx.Data.PlayerUnit.FindStat(stat.Level, 0); lvl.Value < 35 && a.ctx.Data.CharacterCfg.Game.Difficulty == difficulty.Normal {
-			return NewPindleskin().Run()
-
-
-		}
-
-		if lvl, _ := a.ctx.Data.PlayerUnit.FindStat(stat.Level, 0); lvl.Value < 60 && a.ctx.Data.CharacterCfg.Game.Difficulty == difficulty.Nightmare {
-			return NewPindleskin().Run()
-		}
-
-		if lvl, _ := a.ctx.Data.PlayerUnit.FindStat(stat.Level, 0); lvl.Value < 80 && a.ctx.Data.CharacterCfg.Game.Difficulty == difficulty.Hell {
-			return NewPindleskin().Run()
-		}
-	*/
 	err := NewQuests().killAncientsQuest()
 	if err != nil {
 		return err
