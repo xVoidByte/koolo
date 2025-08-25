@@ -67,6 +67,9 @@ func Repair() error {
 			ctx.Logger.Info(logMessage)
 
 			repairNPC := town.GetTownByArea(ctx.Data.PlayerUnit.Area).RepairNPC()
+			if repairNPC == npc.Larzuk {
+				MoveToCoords(data.Position{X: 5135, Y: 5046})
+			}
 			if repairNPC == npc.Hratli {
 				MoveToCoords(data.Position{X: 5224, Y: 5045})
 			}
