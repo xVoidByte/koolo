@@ -5,7 +5,11 @@ As written more detailed below you need to install:
 - Go
 - Garble
 
-Use better_build.bat to build the application. 
+Use better_build.bat to build the application.
+
+-Use "Sorc (Leveling as Fire)" as class. It's currently the only working leveling script.
+-Choose "leveling" as enabled run under "Run Settings"
+-Start your char with lvl 1 as the autoconfig currently works at lvl 1 only. Alternatively you can check act1.go for detailed manual config. This handling will be enhanced later.
 
 For more information there's a discord server mentioned below. Read the information in the f.a.q. and initial-setup channels. The LoD Version 1.13c is pinned in the general channel.
 
@@ -102,7 +106,7 @@ go install mvdan.cc/garble@latest
 
 Next, run the following commands in project root directory:
 ```shell
-git clone https://github.com/hectorgimenez/koolo.git
+git clone https://github.com/kwader2k/koolo.git
 cd koolo
 better_build.bat
 ```
