@@ -15,7 +15,6 @@ import (
 	"github.com/hectorgimenez/koolo/internal/utils"
 )
 
-
 func checkPlayerDeathForTP(ctx *context.Status) error {
 	if ctx.Data.PlayerUnit.HPPercent() <= 0 {
 		return health.ErrDied
@@ -90,7 +89,6 @@ func ReturnTown() error {
 		}
 	}
 
-
 	// Wait for area transition and data sync
 	utils.Sleep(1000)
 	ctx.RefreshGameData()
@@ -157,7 +155,7 @@ func UsePortalInTown() error {
 	}
 
 	// Perform item pickup after re-entering the portal
-	err = PickItems(40)
+	err = ItemPickup(40)
 	if err != nil {
 		ctx.Logger.Warn("Error during item pickup after portal use", "error", err)
 		// If item pickup fails, check if we died
