@@ -13,7 +13,6 @@ import (
 
 	"github.com/hectorgimenez/d2go/pkg/data"
 	"github.com/hectorgimenez/d2go/pkg/data/area"
-	"github.com/hectorgimenez/d2go/pkg/data/item"
 	"github.com/hectorgimenez/d2go/pkg/data/object"
 	"github.com/hectorgimenez/koolo/internal/action/step"
 	"github.com/hectorgimenez/koolo/internal/context"
@@ -312,7 +311,7 @@ func MoveTo(toFunc func() (data.Position, bool)) error {
 						actionLastMonsterHandlingTime = time.Now()
 						_ = ClearAreaAroundPosition(ctx.Data.PlayerUnit.Position, clearPathDist, data.MonsterAnyFilter())
 						// After clearing, immediately try to pick up items
-						lootErr := PickItems(lootAfterCombatRadius)
+						lootErr := ItemPickup(lootAfterCombatRadius)
 						if lootErr != nil {
 							ctx.Logger.Warn("Error picking up items after combat (teleporter)", slog.String("error", lootErr.Error()))
 						}
@@ -346,7 +345,7 @@ func MoveTo(toFunc func() (data.Position, bool)) error {
 						slog.String("error", fmt.Sprintf("%v", clearErr)))
 				}
 				// After engaging, try to pick up items
-				lootErr := PickItems(lootAfterCombatRadius)
+				lootErr := ItemPickup(lootAfterCombatRadius)
 				if lootErr != nil {
 					ctx.Logger.Warn("Error picking up items after combat", slog.String("error", lootErr.Error()))
 				}
@@ -379,7 +378,7 @@ func MoveTo(toFunc func() (data.Position, bool)) error {
 					actionLastMonsterHandlingTime = time.Now()
 					_ = ClearAreaAroundPosition(ctx.Data.PlayerUnit.Position, clearPathDist, data.MonsterAnyFilter())
 					// After fallback engagement, pick up items
-					lootErr := PickItems(lootAfterCombatRadius)
+					lootErr := ItemPickup(lootAfterCombatRadius)
 					if lootErr != nil {
 						ctx.Logger.Warn("Error picking up items after fallback combat", slog.String("error", lootErr.Error()))
 					}
@@ -393,84 +392,4 @@ func MoveTo(toFunc func() (data.Position, bool)) error {
 			return nil
 		}
 	}
-}
-
-// PickItems handles finding and attempting to pick up items within a given radius.
-// This function acts as a wrapper to find eligible items and then calls step.PickupItem for each.
-func PickItems(radius int) error {
-	ctx := context.Get()
-	ctx.Logger.Debug("Action: Checking for items to pick up.")
-
-	foundAndAttemptedPickup := false
-
-	// Filter items that are actually interesting to pick up based on your character config
-	pickableItems := make([]data.Item, 0)
-	for _, it := range ctx.Data.Inventory.ByLocation(item.LocationGround) {
-		if ctx.PathFinder.DistanceFromMe(it.Position) <= radius {
-			// Use your character's pickup filter here.
-			// IMPORTANT: Replace 'true' with your actual item filtering logic, e.g., ctx.CharacterCfg.ShouldPickupItem(it)
-			// For demonstration, assuming all items in range are pickable.
-			if true {
-				pickableItems = append(pickableItems, it)
-			}
-		}
-	}
-
-	// Sort items by distance to pick up closer ones first
-	sort.Slice(pickableItems, func(i, j int) bool {
-		distI := ctx.PathFinder.DistanceFromMe(pickableItems[i].Position)
-		distJ := ctx.PathFinder.DistanceFromMe(pickableItems[j].Position)
-		return distI < distJ
-	})
-
-	for _, it := range pickableItems {
-		ctx.Logger.Debug("Attempting to pick up item", slog.String("item", it.Desc().Name), slog.Any("position", it.Position))
-
-		// Move to the item's position if it's too far for step.PickupItem's internal range check (usually 7 units)
-		// We'll move if distance is > 5 to give some buffer, as step.PickupItem has its own internal 7 unit check.
-		distanceToItem := ctx.PathFinder.DistanceFromMe(it.Position)
-		if distanceToItem > 5 {
-			if err := step.MoveTo(it.Position); err != nil {
-				ctx.Logger.Warn("Failed to move close to item, skipping item", slog.String("item", it.Desc().Name), slog.String("error", err.Error()))
-				// Check for death after failed move to item
-				if errors.Is(err, health.ErrDied) {
-					return err
-				}
-				continue
-			}
-			ctx.RefreshGameData() // Refresh data after moving to check if item is still there / player position is updated
-			// Re-check distance after moving, if still too far, something is wrong
-			if ctx.PathFinder.DistanceFromMe(it.Position) > 7 {
-				ctx.Logger.Warn("Still too far from item after moving, skipping", slog.String("item", it.Desc().Name))
-				continue
-			}
-		}
-
-		// Call the actual step.PickupItem function from the step package
-		// itemPickupAttempt is usually 0 for the first attempt, or can be managed
-		// to try different spiral patterns if it fails. For simplicity here, we use 0.
-		err := step.PickupItem(it, 0) // Pass the full data.Item and initial attempt (0)
-		if err != nil {
-			ctx.Logger.Warn("Failed to pick up item via step.PickupItem", slog.String("item", it.Desc().Name), slog.String("error", err.Error()))
-			// Specifically handle ErrMonsterAroundItem if you want to re-engage
-			if errors.Is(err, step.ErrMonsterAroundItem) {
-				ctx.Logger.Debug("Monsters appeared during item pickup, will re-engage combat.")
-				return err // Propagate this error up to MoveTo to trigger combat
-			}
-			// Check for death after failed pickup
-			if errors.Is(err, health.ErrDied) {
-				return err
-			}
-			continue // Skip this item, try next
-		}
-		foundAndAttemptedPickup = true
-		utils.Sleep(200) // Small delay after successful pickup
-
-		ctx.RefreshGameData() // Refresh data to confirm item is gone
-	}
-
-	if !foundAndAttemptedPickup {
-		ctx.Logger.Debug("No eligible items found or successfully picked up in range.")
-	}
-	return nil // Return nil on completion, even if some items failed (unless ErrMonsterAroundItem)
 }
