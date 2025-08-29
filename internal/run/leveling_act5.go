@@ -227,20 +227,6 @@ func (a Leveling) act5() error {
 		step.CloseAllMenus() // Close inventory after attempt
 	}
 
-	/*	if lvl, _ := a.ctx.Data.PlayerUnit.FindStat(stat.Level, 0); lvl.Value < 35 && a.ctx.Data.CharacterCfg.Game.Difficulty == difficulty.Normal {
-			return NewPindleskin().Run()
-
-
-		}
-
-		if lvl, _ := a.ctx.Data.PlayerUnit.FindStat(stat.Level, 0); lvl.Value < 60 && a.ctx.Data.CharacterCfg.Game.Difficulty == difficulty.Nightmare {
-			return NewPindleskin().Run()
-		}
-
-		if lvl, _ := a.ctx.Data.PlayerUnit.FindStat(stat.Level, 0); lvl.Value < 80 && a.ctx.Data.CharacterCfg.Game.Difficulty == difficulty.Hell {
-			return NewPindleskin().Run()
-		}
-	*/
 	if !a.ctx.Data.Quests[quest.Act5RiteOfPassage].Completed() {
 		err := NewQuests().killAncientsQuest()
 		if err != nil {
@@ -269,4 +255,5 @@ func (a Leveling) CrystallinePassage() error {
 	a.ctx.Logger.Info("Successfully cleared Crystalline Passage area.")
 
 	return nil
+
 }
