@@ -14,7 +14,6 @@ import (
 	"github.com/hectorgimenez/koolo/internal/action/step"
 	"github.com/hectorgimenez/koolo/internal/context"
 	"github.com/hectorgimenez/koolo/internal/game"
-
 )
 
 const (
@@ -43,7 +42,7 @@ func (s PaladinLeveling) CheckKeyBindings() []skill.ID {
 }
 
 func (s PaladinLeveling) KillMonsterSequence(
-monsterSelector func(d game.Data) (data.UnitID, bool),
+	monsterSelector func(d game.Data) (data.UnitID, bool),
 	skipOnImmunities []stat.Resist,
 ) error {
 	const priorityMonsterSearchRange = 15
@@ -119,6 +118,10 @@ monsterSelector func(d game.Data) (data.UnitID, bool),
 			}
 			step.PrimaryAttack(id, numOfAttacks, false, step.Distance(2, 7), step.EnsureAura(skill.Concentration))
 
+			// Perform random movement to reposition for the next attack
+			s.Logger.Debug("Performing random movement to reposition.")
+			s.PathFinder.RandomMovement()
+			time.Sleep(time.Millisecond * 150)
 		} else {
 			if s.Data.PlayerUnit.Skills[skill.Zeal].Level > 0 {
 				s.Logger.Debug("Using Zeal")
@@ -127,13 +130,6 @@ monsterSelector func(d game.Data) (data.UnitID, bool),
 			s.Logger.Debug("Using primary attack with Holy Fire aura")
 			step.PrimaryAttack(id, numOfAttacks, false, step.Distance(1, 3), step.EnsureAura(skill.HolyFire))
 		}
-
-
-		time.Sleep(time.Millisecond * 150)
-		
-		// Perform random movement to reposition for the next attack
-		s.Logger.Debug("Performing random movement to reposition.")
-		s.PathFinder.RandomMovement()
 
 		completedAttackLoops++
 		previousUnitID = int(id)
@@ -325,7 +321,7 @@ func (s PaladinLeveling) SkillPoints() []skill.ID {
 	if len(skillsToAllocate) > 0 {
 		s.Logger.Info("Skill allocation plan", "skills", skillsToAllocate)
 	}
-	
+
 	return skillsToAllocate
 }
 
@@ -334,7 +330,39 @@ func (s PaladinLeveling) KillCountess() error {
 }
 
 func (s PaladinLeveling) KillAndariel() error {
-	return s.killMonster(npc.Andariel, data.MonsterTypeUnique)
+		s.Logger.Info("Starting Andariel kill sequence...")
+	timeout := time.Second * 160
+	startTime := time.Now()
+
+	for {
+		andariel, found := s.Data.Monsters.FindOne(npc.Andariel, data.MonsterTypeUnique)
+		if !found {
+			if time.Since(startTime) > timeout {
+				s.Logger.Error("Andariel was not found, timeout reached.")
+				return errors.New("Andariel not found within the time limit")
+			}
+			time.Sleep(time.Second / 2)
+			continue
+		}
+
+		if andariel.Stats[stat.Life] <= 0 {
+			s.Logger.Info("Andariel is dead.")
+			return nil
+		}
+
+		numOfAttacks := 5
+		if s.Data.PlayerUnit.Skills[skill.BlessedHammer].Level > 0 {
+			step.PrimaryAttack(andariel.UnitID, numOfAttacks, false, step.Distance(2, 7), step.EnsureAura(skill.Concentration))
+			s.Logger.Debug("Performing random movement to reposition.")
+			s.PathFinder.RandomMovement()
+			time.Sleep(time.Millisecond * 250)
+		} else {
+			if s.Data.PlayerUnit.Skills[skill.Zeal].Level > 0 {
+				numOfAttacks = 1 // Zeal is a multi-hit skill, 1 click is a sequence of attacks
+			}
+			step.PrimaryAttack(andariel.UnitID, numOfAttacks, false, step.Distance(1, 3), step.EnsureAura(skill.HolyFire))
+		}
+	}
 }
 
 func (s PaladinLeveling) KillSummoner() error {
@@ -362,20 +390,18 @@ func (s PaladinLeveling) KillDuriel() error {
 			return nil
 		}
 
-numOfAttacks := 5
+		numOfAttacks := 5
 		if s.Data.PlayerUnit.Skills[skill.BlessedHammer].Level > 0 {
 			step.PrimaryAttack(duriel.UnitID, numOfAttacks, false, step.Distance(2, 7), step.EnsureAura(skill.Concentration))
+			s.Logger.Debug("Performing random movement to reposition.")
+			s.PathFinder.RandomMovement()
+			time.Sleep(time.Millisecond * 250)
 		} else {
 			if s.Data.PlayerUnit.Skills[skill.Zeal].Level > 0 {
 				numOfAttacks = 1 // Zeal is a multi-hit skill, 1 click is a sequence of attacks
 			}
 			step.PrimaryAttack(duriel.UnitID, numOfAttacks, false, step.Distance(1, 3), step.EnsureAura(skill.HolyFire))
 		}
-
-		time.Sleep(time.Millisecond * 150)
-		s.Logger.Debug("Performing random movement to reposition.")
-		s.PathFinder.RandomMovement()
-		time.Sleep(time.Millisecond * 250)
 	}
 }
 
@@ -427,20 +453,18 @@ func (s PaladinLeveling) KillMephisto() error {
 			return nil
 		}
 
-numOfAttacks := 5
+		numOfAttacks := 5
 		if s.Data.PlayerUnit.Skills[skill.BlessedHammer].Level > 0 {
 			step.PrimaryAttack(mephisto.UnitID, numOfAttacks, false, step.Distance(2, 7), step.EnsureAura(skill.Concentration))
+			s.Logger.Debug("Performing random movement to reposition.")
+			s.PathFinder.RandomMovement()
+			time.Sleep(time.Millisecond * 250)
 		} else {
 			if s.Data.PlayerUnit.Skills[skill.Zeal].Level > 0 {
 				numOfAttacks = 1 // Zeal is a multi-hit skill, 1 click is a sequence of attacks
 			}
 			step.PrimaryAttack(mephisto.UnitID, numOfAttacks, false, step.Distance(1, 3), step.EnsureAura(skill.HolyFire))
 		}
-
-		time.Sleep(time.Millisecond * 150)
-		s.Logger.Debug("Performing random movement to reposition.")
-		s.PathFinder.RandomMovement()
-		time.Sleep(time.Millisecond * 250)
 	}
 }
 
@@ -465,7 +489,7 @@ func (s PaladinLeveling) KillIzual() error {
 			// Izual is too far, move closer to him instead of waiting.
 			s.Logger.Debug(fmt.Sprintf("Izual is too far away (%d), moving closer.", distance))
 			step.MoveTo(izual.Position)
-			continue                    // Restart the loop to re-evaluate distance
+			continue // Restart the loop to re-evaluate distance
 		}
 
 		if izual.Stats[stat.Life] <= 0 {
@@ -476,17 +500,15 @@ func (s PaladinLeveling) KillIzual() error {
 		numOfAttacks := 5
 		if s.Data.PlayerUnit.Skills[skill.BlessedHammer].Level > 0 {
 			step.PrimaryAttack(izual.UnitID, numOfAttacks, false, step.Distance(2, 7), step.EnsureAura(skill.Concentration))
+			s.Logger.Debug("Performing random movement to reposition.")
+			s.PathFinder.RandomMovement()
+			time.Sleep(time.Millisecond * 250)
 		} else {
 			if s.Data.PlayerUnit.Skills[skill.Zeal].Level > 0 {
 				numOfAttacks = 1 // Zeal is a multi-hit skill, 1 click is a sequence of attacks
 			}
 			step.PrimaryAttack(izual.UnitID, numOfAttacks, false, step.Distance(1, 3), step.EnsureAura(skill.HolyFire))
 		}
-
-		time.Sleep(time.Millisecond * 150)
-		s.Logger.Debug("Performing random movement to reposition.")
-		s.PathFinder.RandomMovement()
-		time.Sleep(time.Millisecond * 250)
 	}
 }
 
@@ -520,14 +542,13 @@ func (s PaladinLeveling) KillDiablo() error {
 		numOfAttacks := 10
 		if s.Data.PlayerUnit.Skills[skill.BlessedHammer].Level > 0 {
 			step.PrimaryAttack(diablo.UnitID, numOfAttacks, false, step.Distance(2, 7), step.EnsureAura(skill.Concentration))
+			time.Sleep(time.Millisecond * 250)
 		} else {
 			if s.Data.PlayerUnit.Skills[skill.Zeal].Level > 0 {
 				numOfAttacks = 1
 			}
 			step.PrimaryAttack(diablo.UnitID, numOfAttacks, false, step.Distance(1, 3), step.EnsureAura(skill.HolyFire))
 		}
-
-		time.Sleep(time.Millisecond * 250)
 	}
 }
 
@@ -563,7 +584,7 @@ func (s PaladinLeveling) KillAncients() error {
 }
 
 func (s PaladinLeveling) KillBaal() error {
-	
+
 	s.Logger.Info("Starting Baal kill sequence...")
 	// Increased timeout to find Baal, giving more time for him to spawn.
 	timeout := time.Second * 600
@@ -590,17 +611,14 @@ func (s PaladinLeveling) KillBaal() error {
 		numOfAttacks := 5
 		if s.Data.PlayerUnit.Skills[skill.BlessedHammer].Level > 0 {
 			step.PrimaryAttack(baal.UnitID, numOfAttacks, false, step.Distance(2, 7), step.EnsureAura(skill.Concentration))
+			s.Logger.Debug("Performing random movement to reposition.")
+			s.PathFinder.RandomMovement()
+			time.Sleep(time.Millisecond * 250)
 		} else {
 			if s.Data.PlayerUnit.Skills[skill.Zeal].Level > 0 {
 				numOfAttacks = 1 // Zeal is a multi-hit skill, 1 click is a sequence of attacks
 			}
 			step.PrimaryAttack(baal.UnitID, numOfAttacks, false, step.Distance(1, 3), step.EnsureAura(skill.HolyFire))
 		}
-
-		time.Sleep(time.Millisecond * 150)
-		s.Logger.Debug("Performing random movement to reposition.")
-		s.PathFinder.RandomMovement()
-		time.Sleep(time.Millisecond * 250)
 	}
 }
-
