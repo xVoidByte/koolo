@@ -164,6 +164,12 @@
             </fieldset>
             <fieldset class="grid">
                 <label>
+                    <input type="checkbox" name="interactWithShrines" {{ if .Config.Game.InteractWithShrines }}checked{{ end }}/>
+                    Interact with shrines
+                </label>
+            </fieldset>
+            <fieldset class="grid">
+                <label>
             <div id="clearPathDistContainer" class="conditional-field" {{ if .Config.Character.UseTeleport }}style="display: none;"{{ end }}>
                 <div class="walking-radius-container">
                     <label for="clearPathDist">Clear Path Radius</label>

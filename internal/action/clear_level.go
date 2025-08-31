@@ -67,7 +67,7 @@ func ClearCurrentLevel(openChests bool, filter data.MonsterFilter) error {
 				}
 
 				// Interact with desired shrine types
-				if o.IsShrine() && o.Selectable {
+				if ctx.CharacterCfg.Game.InteractWithShrines && o.IsShrine() && o.Selectable {
 					for _, shrineType := range interactableShrines {
 						if o.Shrine.ShrineType == shrineType {
 							ctx.Logger.Debug(fmt.Sprintf("Found %s shrine. attempting to interact. Name=%s. ID=%v UnitID=%v Pos=%v,%v Area='%s' InteractType=%v", o.Desc().Name, o.Desc().Name, o.ID, o.Position.X, o.Position.Y, ctx.Data.PlayerUnit.Area.Area().Name, o.InteractType))
@@ -84,7 +84,7 @@ func ClearCurrentLevel(openChests bool, filter data.MonsterFilter) error {
 								ctx.Logger.Warn("Failed interacting with shrine", slog.Any("error", err))
 							}
 							utils.Sleep(500)
-							break 
+							break
 						}
 					}
 				}

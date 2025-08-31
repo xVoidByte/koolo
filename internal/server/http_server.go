@@ -888,6 +888,7 @@ func (s *HttpServer) characterSettings(w http.ResponseWriter, r *http.Request) {
 		cfg.Game.MinGoldPickupThreshold, _ = strconv.Atoi(r.Form.Get("gameMinGoldPickupThreshold"))
 		cfg.UseCentralizedPickit = r.Form.Has("useCentralizedPickit")
 		cfg.Game.UseCainIdentify = r.Form.Has("useCainIdentify")
+		cfg.Game.InteractWithShrines = r.Form.Has("interactWithShrines")
 		cfg.Game.Difficulty = difficulty.Difficulty(r.Form.Get("gameDifficulty"))
 		cfg.Game.RandomizeRuns = r.Form.Has("gameRandomizeRuns")
 
@@ -963,7 +964,7 @@ func (s *HttpServer) characterSettings(w http.ResponseWriter, r *http.Request) {
 		cfg.Game.Leveling.EnsureKeyBinding = r.Form.Has("gameLevelingEnsureKeyBinding")
 		cfg.Game.Leveling.AutoEquip = r.Form.Has("gameLevelingAutoEquip")
 		cfg.Game.Leveling.AutoEquipFromSharedStash = r.Form.Has("gameLevelingAutoEquipFromSharedStash")
-			// Socket Recipes
+		// Socket Recipes
 		cfg.Game.Leveling.EnableRunewordMaker = r.Form.Has("gameLevelingEnableRunewordMaker")
 		enabledRunewordRecipes := r.Form["gameLevelingEnabledRunewordRecipes"]
 		cfg.Game.Leveling.EnabledRunewordRecipes = enabledRunewordRecipes
@@ -1064,13 +1065,13 @@ func (s *HttpServer) characterSettings(w http.ResponseWriter, r *http.Request) {
 	dayNames := []string{"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
 
 	s.templates.ExecuteTemplate(w, "character_settings.gohtml", CharacterSettings{
-		Supervisor:   supervisor,
-		Config:       cfg,
-		DayNames:     dayNames,
-		EnabledRuns:  enabledRuns,
-		DisabledRuns: disabledRuns,
-		AvailableTZs: availableTZs,
-		RecipeList:   config.AvailableRecipes,
+		Supervisor:         supervisor,
+		Config:             cfg,
+		DayNames:           dayNames,
+		EnabledRuns:        enabledRuns,
+		DisabledRuns:       disabledRuns,
+		AvailableTZs:       availableTZs,
+		RecipeList:         config.AvailableRecipes,
 		RunewordRecipeList: config.AvailableRunewordRecipes,
 	})
 }
