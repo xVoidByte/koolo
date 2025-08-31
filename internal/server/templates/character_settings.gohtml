@@ -158,11 +158,17 @@
             <fieldset class="grid">
                 <label>
                     <input type="checkbox" name="useCentralizedPickit" {{ if .Config.UseCentralizedPickit }}checked{{ end }}/>
-                    Use centralized pickit 
+                    Use centralized pickit
                 </label>
                 <label>
                     <input type="checkbox" name="useCainIdentify" {{ if .Config.Game.UseCainIdentify }}checked{{ end }}/>
                     Identify with Cain
+                </label>
+            </fieldset>
+            <fieldset class="grid">
+                <label>
+                    <input type="checkbox" name="interactWithShrines" {{ if .Config.Game.InteractWithShrines }}checked{{ end }}/>
+                    Interact with shrines
                 </label>
             </fieldset>
             <fieldset class="grid">

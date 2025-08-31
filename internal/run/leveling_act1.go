@@ -55,14 +55,14 @@ func (a Leveling) act1() error {
 
 				a.ctx.CharacterCfg.Character.ClearPathDist = 20
 
-					if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
-				a.ctx.Logger.Error(fmt.Sprintf("Failed to save character configuration: %s", err.Error()))
-			}} 	
+				if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
+					a.ctx.Logger.Error(fmt.Sprintf("Failed to save character configuration: %s", err.Error()))
+				}
+			}
 
 			return NewMausoleum().Run()
-			}
 		}
-
+	}
 
 	if !a.ctx.Data.Quests[quest.Act1DenOfEvil].Completed() && a.ctx.CharacterCfg.Game.Difficulty != difficulty.Hell {
 		a.ctx.Logger.Debug("Completing Den of Evil")
@@ -136,12 +136,13 @@ func (a Leveling) act1() error {
 
 		if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Normal {
 
-		a.ctx.CharacterCfg.Character.ClearPathDist = 7
-		a.ctx.CharacterCfg.Inventory.BeltColumns = [4]string{"healing", "healing", "mana", "mana"}
-		if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
-			a.ctx.Logger.Error(fmt.Sprintf("Failed to save character configuration: %s", err.Error()))
+			a.ctx.CharacterCfg.Character.ClearPathDist = 7
+			a.ctx.CharacterCfg.Inventory.BeltColumns = [4]string{"healing", "healing", "mana", "mana"}
+			if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
+				a.ctx.Logger.Error(fmt.Sprintf("Failed to save character configuration: %s", err.Error()))
 
-		}}
+			}
+		}
 		return NewAndariel().Run()
 	}
 }
@@ -192,6 +193,7 @@ func (a Leveling) setupLevelOneConfig() {
 		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 	}
+	a.ctx.CharacterCfg.Game.InteractWithShrines = true
 	if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
 		a.ctx.Logger.Error(fmt.Sprintf("Failed to save character configuration: %s", err.Error()))
 	}
