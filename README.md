@@ -7,11 +7,11 @@ As written more detailed below you need to install:
 
 Use better_build.bat to build the application.
 
--Use "Sorc (Leveling as Fire)" as class. It's currently the only working leveling script.
--Choose "leveling" as enabled run under "Run Settings"
--Start your char with lvl 1 as the autoconfig currently works at lvl 1 only. Alternatively you can check act1.go for detailed manual config. This handling will be enhanced later.
+- Use "Sorc (Leveling as Fire)" as class. It's currently the only working leveling script.
+- Choose "leveling" as enabled run under "Run Settings"
+- Start your char with lvl 1 as the autoconfig currently works at lvl 1 only. Alternatively you can check act1.go for detailed manual config. This handling will be enhanced later.
 
-For more information there's a discord server mentioned below. Read the information in the f.a.q. and initial-setup channels. The LoD Version 1.13c is pinned in the general channel.
+Interested in more features? You can join the development or just give give us your feedback in the following discord server: https://discord.gg/eQpdb4KX.
 
 ---
 <div style="background-color: #FFFACD; padding: 10px; border-radius: 5px; text-align: center">
