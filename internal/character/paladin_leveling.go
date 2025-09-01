@@ -106,10 +106,10 @@ func (s PaladinLeveling) KillMonsterSequence(
 		}
 
 		numOfAttacks := 5
+		lvl, _ := s.Data.PlayerUnit.FindStat(stat.Level, 0)
 
 		if s.Data.PlayerUnit.Skills[skill.BlessedHammer].Level > 0 {
 			s.Logger.Debug("Using Blessed Hammer")
-			// Add a random movement, maybe hammer is not hitting the target
 			if previousUnitID == int(id) {
 				if monster.Stats[stat.Life] > 0 {
 					s.PathFinder.RandomMovement()
@@ -118,16 +118,20 @@ func (s PaladinLeveling) KillMonsterSequence(
 			}
 			step.PrimaryAttack(id, numOfAttacks, false, step.Distance(2, 7), step.EnsureAura(skill.Concentration))
 
-			// Perform random movement to reposition for the next attack
 			s.Logger.Debug("Performing random movement to reposition.")
 			s.PathFinder.RandomMovement()
 			time.Sleep(time.Millisecond * 150)
-		} else {
-			if s.Data.PlayerUnit.Skills[skill.Zeal].Level > 0 {
-				s.Logger.Debug("Using Zeal")
-				numOfAttacks = 1
-			}
-			s.Logger.Debug("Using primary attack with Holy Fire aura")
+		} else if lvl.Value < 6 {
+			s.Logger.Debug("Using Might and Sacrifice")
+			numOfAttacks = 1
+			step.PrimaryAttack(id, numOfAttacks, false, step.Distance(1, 3), step.EnsureAura(skill.Might))
+		} else if lvl.Value >= 6 && lvl.Value < 12 {
+			s.Logger.Debug("Using Holy Fire and Sacrifice")
+			numOfAttacks = 1
+			step.PrimaryAttack(id, numOfAttacks, false, step.Distance(1, 3), step.EnsureAura(skill.HolyFire))
+		} else { // 12-24
+			s.Logger.Debug("Using Holy Fire and Zeal")
+			numOfAttacks = 1
 			step.PrimaryAttack(id, numOfAttacks, false, step.Distance(1, 3), step.EnsureAura(skill.HolyFire))
 		}
 
@@ -185,17 +189,25 @@ func (s PaladinLeveling) SkillsToBind() (skill.ID, []skill.ID) {
 
 	if s.Data.PlayerUnit.Skills[skill.BlessedHammer].Level > 0 && lvl.Value >= 18 {
 		mainSkill = skill.BlessedHammer
-	} else if s.Data.PlayerUnit.Skills[skill.Zeal].Level > 0 {
+	} else if lvl.Value < 6 {
+		mainSkill = skill.Sacrifice
+	} else if lvl.Value >= 6 && lvl.Value < 12 {
+		mainSkill = skill.Sacrifice
+	} else {
 		mainSkill = skill.Zeal
 	}
 
 	if s.Data.PlayerUnit.Skills[skill.Concentration].Level > 0 && lvl.Value >= 18 {
 		skillBindings = append(skillBindings, skill.Concentration)
 	} else {
-		if _, found := s.Data.PlayerUnit.Skills[skill.HolyFire]; found {
-			skillBindings = append(skillBindings, skill.HolyFire)
-		} else if _, found := s.Data.PlayerUnit.Skills[skill.Might]; found {
-			skillBindings = append(skillBindings, skill.Might)
+		if lvl.Value < 6 {
+			if _, found := s.Data.PlayerUnit.Skills[skill.Might]; found {
+				skillBindings = append(skillBindings, skill.Might)
+			}
+		} else {
+			if _, found := s.Data.PlayerUnit.Skills[skill.HolyFire]; found {
+				skillBindings = append(skillBindings, skill.HolyFire)
+			}
 		}
 	}
 
@@ -225,75 +237,44 @@ func (s PaladinLeveling) StatPoints() []context.StatAllocation {
 	return targets
 }
 
+// THIS FUNCTION HAS BEEN MODIFIED
 func (s PaladinLeveling) SkillPoints() []skill.ID {
 	lvl, _ := s.Data.PlayerUnit.FindStat(stat.Level, 0)
 
 	var skillSequence []skill.ID
 
-	if lvl.Value < 23 {
+	if lvl.Value < 24 {
 		// Holy Fire build allocation for levels 1-23
 		skillSequence = []skill.ID{
-			skill.Might,       // Lvl 2
-			skill.Sacrifice,   // Lvl 3
-			skill.ResistFire,  // Lvl 4
-			skill.ResistFire,  // Lvl 5
-			skill.ResistFire,  // Lvl 6
-			skill.HolyFire,    // Lvl 7
-			skill.HolyFire,    // Lvl 8
-			skill.HolyFire,    // Lvl 9
-			skill.HolyFire,    // Lvl 10
-			skill.HolyFire,    // Lvl 11
-			skill.HolyFire,    // Lvl 12
-			skill.Zeal,        // Lvl 13
-			skill.HolyFire,    // Lvl 14
-			skill.HolyFire,    // Lvl 15
-			skill.HolyFire,    // Lvl 16
-			skill.HolyFire,    // Lvl 17
-			skill.HolyFire,    // Lvl 18
-			skill.HolyFire,    // Lvl 19
-			skill.HolyFire,    // Lvl 20
-			skill.HolyFire,    // Lvl 21
-			skill.HolyFire,    // Lvl 22
-			skill.HolyFire,    // Lvl 23
+			skill.Might, skill.Sacrifice, skill.ResistFire, skill.ResistFire, skill.ResistFire,
+			skill.HolyFire, skill.HolyFire, skill.HolyFire, skill.HolyFire, skill.HolyFire,
+			skill.HolyFire, skill.Zeal, skill.HolyFire, skill.HolyFire, skill.HolyFire,
+			skill.HolyFire, skill.HolyFire, skill.HolyFire, skill.HolyFire, skill.HolyFire,
+			skill.HolyFire, skill.HolyFire, skill.HolyFire,
 		}
 	} else {
 		// Hammerdin build allocation for levels 24+
 		skillSequence = []skill.ID{
-			// Prerequisites for core skills
 			skill.Might, skill.HolyBolt, skill.Prayer, skill.Defiance, skill.BlessedAim,
 			skill.Cleansing, skill.Concentration, skill.Vigor, skill.Smite, skill.Charge,
 			skill.BlessedHammer,
-
-			// Points from level 24-29
 			skill.BlessedHammer, skill.BlessedHammer, skill.BlessedHammer, skill.BlessedHammer, skill.BlessedHammer,
-
-			// Level 30 point
 			skill.HolyShield,
-
-			// Continue maxing Blessed Hammer
 			skill.BlessedHammer, skill.BlessedHammer, skill.BlessedHammer, skill.BlessedHammer, skill.BlessedHammer,
 			skill.BlessedHammer, skill.BlessedHammer, skill.BlessedHammer, skill.BlessedHammer, skill.BlessedHammer,
 			skill.BlessedHammer, skill.BlessedHammer, skill.BlessedHammer,
-
-			// Max Vigor (Synergy)
 			skill.Vigor, skill.Vigor, skill.Vigor, skill.Vigor, skill.Vigor,
 			skill.Vigor, skill.Vigor, skill.Vigor, skill.Vigor, skill.Vigor,
 			skill.Vigor, skill.Vigor, skill.Vigor, skill.Vigor, skill.Vigor,
 			skill.Vigor, skill.Vigor, skill.Vigor, skill.Vigor,
-
-			// Max Blessed Aim (Synergy)
 			skill.BlessedAim, skill.BlessedAim, skill.BlessedAim, skill.BlessedAim, skill.BlessedAim,
 			skill.BlessedAim, skill.BlessedAim, skill.BlessedAim, skill.BlessedAim, skill.BlessedAim,
 			skill.BlessedAim, skill.BlessedAim, skill.BlessedAim, skill.BlessedAim, skill.BlessedAim,
 			skill.BlessedAim, skill.BlessedAim, skill.BlessedAim, skill.BlessedAim,
-
-			// Max Concentration (Aura)
 			skill.Concentration, skill.Concentration, skill.Concentration, skill.Concentration, skill.Concentration,
 			skill.Concentration, skill.Concentration, skill.Concentration, skill.Concentration, skill.Concentration,
 			skill.Concentration, skill.Concentration, skill.Concentration, skill.Concentration, skill.Concentration,
 			skill.Concentration, skill.Concentration, skill.Concentration, skill.Concentration,
-
-			// Rest into Holy Shield
 			skill.HolyShield, skill.HolyShield, skill.HolyShield, skill.HolyShield, skill.HolyShield,
 			skill.HolyShield, skill.HolyShield, skill.HolyShield, skill.HolyShield, skill.HolyShield,
 			skill.HolyShield, skill.HolyShield, skill.HolyShield, skill.HolyShield, skill.HolyShield,
@@ -301,20 +282,53 @@ func (s PaladinLeveling) SkillPoints() []skill.ID {
 		}
 	}
 
-	// This logic now applies to both builds
+	questSkillPoints := 0
+	// At level 24 reset, we only have Akara and Radament points (+2)
+	// We are assuming Izual quest is completed around level 27-28
+	if lvl.Value >= 28 {
+		questSkillPoints = 4 // Akara (+1), Radament (+1), Izual (+2)
+	} else if lvl.Value >= 17 { // Assuming Radament is done by this level
+		questSkillPoints = 2 // Akara (+1), Radament (+1)
+	} else if lvl.Value >= 2 { // Den of evil is the first quest
+		questSkillPoints = 1 // Akara (+1)
+	}
+
+	// Calculate total points to spend: (level - 1) for leveling + quest points
+	totalPoints := (int(lvl.Value) - 1) + questSkillPoints
+	if totalPoints < 0 {
+		totalPoints = 0
+	}
+
+	// Limit the skill sequence to the number of available points
+	var skillsToAllocateBasedOnLevel []skill.ID
+	if totalPoints < len(skillSequence) {
+		skillsToAllocateBasedOnLevel = skillSequence[:totalPoints]
+	} else {
+		skillsToAllocateBasedOnLevel = skillSequence
+	}
+
 	skillsToAllocate := make([]skill.ID, 0)
 	targetLevels := make(map[skill.ID]int)
-	for _, sk := range skillSequence {
+	for _, sk := range skillsToAllocateBasedOnLevel {
 		targetLevels[sk]++
+	}
+
+	// We iterate over the original sequence to respect the order of skill allocation
+	for _, sk := range skillSequence {
+		target := targetLevels[sk]
+		if target == 0 {
+			continue
+		}
+
 		currentLevel := 0
 		if skillData, found := s.Data.PlayerUnit.Skills[sk]; found {
 			currentLevel = int(skillData.Level)
 		}
 
-		// If the character's current level for this skill is less than the target,
-		// add it to the list of skills we need to allocate points to.
-		if currentLevel < targetLevels[sk] {
-			skillsToAllocate = append(skillsToAllocate, sk)
+		if currentLevel < target {
+			for i := 0; i < (target - currentLevel); i++ {
+				skillsToAllocate = append(skillsToAllocate, sk)
+			}
 		}
 	}
 
@@ -486,10 +500,9 @@ func (s PaladinLeveling) KillIzual() error {
 
 		distance := s.PathFinder.DistanceFromMe(izual.Position)
 		if distance > 7 {
-			// Izual is too far, move closer to him instead of waiting.
 			s.Logger.Debug(fmt.Sprintf("Izual is too far away (%d), moving closer.", distance))
 			step.MoveTo(izual.Position)
-			continue // Restart the loop to re-evaluate distance
+			continue 
 		}
 
 		if izual.Stats[stat.Life] <= 0 {
@@ -505,7 +518,7 @@ func (s PaladinLeveling) KillIzual() error {
 			time.Sleep(time.Millisecond * 250)
 		} else {
 			if s.Data.PlayerUnit.Skills[skill.Zeal].Level > 0 {
-				numOfAttacks = 1 // Zeal is a multi-hit skill, 1 click is a sequence of attacks
+				numOfAttacks = 1 
 			}
 			step.PrimaryAttack(izual.UnitID, numOfAttacks, false, step.Distance(1, 3), step.EnsureAura(skill.HolyFire))
 		}
@@ -514,29 +527,24 @@ func (s PaladinLeveling) KillIzual() error {
 
 func (s PaladinLeveling) KillDiablo() error {
 	s.Logger.Info("Starting Diablo kill sequence...")
-	// Increased timeout to find Diablo, giving more time for him to spawn.
 	timeout := time.Second * 120
 	startTime := time.Now()
 
-	// This is now a persistent loop that will continue until Diablo is dead.
 	for {
-		// Step 1: Find Diablo.
 		diablo, found := s.Data.Monsters.FindOne(npc.Diablo, data.MonsterTypeUnique)
 
-		// If Diablo is not found, wait and retry until the timeout is reached.
 		if !found {
 			if time.Since(startTime) > timeout {
 				s.Logger.Error("Diablo was not found, timeout reached.")
 				return errors.New("diablo not found within the time limit")
 			}
-			time.Sleep(time.Second / 2) // Wait half a second before checking again.
+			time.Sleep(time.Second / 2) 
 			continue
 		}
 
-		// Step 2: Check if Diablo is already dead.
 		if diablo.Stats[stat.Life] <= 0 {
 			s.Logger.Info("Diablo is dead.")
-			return nil // Success!
+			return nil 
 		}
 
 		numOfAttacks := 10
@@ -586,11 +594,9 @@ func (s PaladinLeveling) KillAncients() error {
 func (s PaladinLeveling) KillBaal() error {
 
 	s.Logger.Info("Starting Baal kill sequence...")
-	// Increased timeout to find Baal, giving more time for him to spawn.
 	timeout := time.Second * 600
 	startTime := time.Now()
 
-	// This is now a persistent loop that will continue until Baal is dead.
 	for {
 		baal, found := s.Data.Monsters.FindOne(npc.BaalCrab, data.MonsterTypeUnique)
 
@@ -599,13 +605,13 @@ func (s PaladinLeveling) KillBaal() error {
 				s.Logger.Error("Baal was not found, timeout reached.")
 				return errors.New("Baal not found within the time limit")
 			}
-			time.Sleep(time.Second / 2) // Wait half a second before checking again.
+			time.Sleep(time.Second / 2) 
 			continue
 		}
 
 		if baal.Stats[stat.Life] <= 0 {
 			s.Logger.Info("Baal is dead.")
-			return nil // Success!
+			return nil 
 		}
 
 		numOfAttacks := 5
@@ -616,7 +622,7 @@ func (s PaladinLeveling) KillBaal() error {
 			time.Sleep(time.Millisecond * 250)
 		} else {
 			if s.Data.PlayerUnit.Skills[skill.Zeal].Level > 0 {
-				numOfAttacks = 1 // Zeal is a multi-hit skill, 1 click is a sequence of attacks
+				numOfAttacks = 1
 			}
 			step.PrimaryAttack(baal.UnitID, numOfAttacks, false, step.Distance(1, 3), step.EnsureAura(skill.HolyFire))
 		}
