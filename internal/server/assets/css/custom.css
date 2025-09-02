@@ -366,3 +366,10 @@
     color: #666;
     margin-top: 0.5rem;
 }
+
+.sticky-bottom {
+    position: sticky;
+    bottom: 0;
+    background-color: var(--pico-background-color);
+    margin-bottom: 0;
+}
