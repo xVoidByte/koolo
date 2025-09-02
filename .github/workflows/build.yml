@@ -35,7 +35,7 @@ jobs:
 
       - name: "Install Garble"
         run: |
-          go install mvdan.cc/garble@latest
+          go install mvdan.cc/garble@v0.14.2
           Add-Content $env:GITHUB_PATH "$env:USERPROFILE\go\bin"
 
       - name: "Building Obfuscated artifacts"
