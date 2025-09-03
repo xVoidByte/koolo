@@ -10,6 +10,7 @@ import (
 	"github.com/hectorgimenez/koolo/internal/action"
 	"github.com/hectorgimenez/koolo/internal/config"
 	"github.com/hectorgimenez/koolo/internal/context"
+	"github.com/hectorgimenez/koolo/internal/utils"
 )
 
 var diabloSpawnPosition = data.Position{X: 7792, Y: 5294}
@@ -115,11 +116,32 @@ func (d *Diablo) Run() error {
 				action.Buff()
 			}
 
-			if err = action.InteractObject(seal, func() bool {
+			maxAttemptsToOpenSeal := 3
+			attempts := 0
+
+			for attempts < maxAttemptsToOpenSeal {
 				seal, _ = d.ctx.Data.Objects.FindOne(sealID)
-				return !seal.Selectable
-			}); err != nil {
-				return fmt.Errorf("failed to interact with seal: %w", err)
+
+				if !seal.Selectable {
+					break
+				}
+
+				if err = action.InteractObject(seal, func() bool {
+					seal, _ = d.ctx.Data.Objects.FindOne(sealID)
+					return !seal.Selectable
+				}); err != nil {
+					d.ctx.Logger.Error(fmt.Sprintf("Attempt %d to interact with seal %d: %v failed", attempts+1, sealID, err))
+					d.ctx.PathFinder.RandomMovement()
+					utils.Sleep(200)
+				}
+
+				attempts++
+			}
+
+			seal, _ = d.ctx.Data.Objects.FindOne(sealID)
+			if seal.Selectable {
+				d.ctx.Logger.Error(fmt.Sprintf("Failed to open seal %d after %d attempts", sealID, maxAttemptsToOpenSeal))
+				return fmt.Errorf("failed to open seal %d after %d attempts", sealID, maxAttemptsToOpenSeal)
 			}
 
 			// Infector spawns when first seal is enabled
