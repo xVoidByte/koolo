@@ -15,7 +15,7 @@ func PreRun(firstRun bool) error {
 	DropMouseItem()
 	step.SetSkill(skill.Vigor)
 	RecoverCorpse()
-	ManageBelt()
+	ConsumeMisplacedPotionsInBelt()
 	// Just to make sure messages like TZ change or public game spam arent on the way
 	ClearMessages()
 	RefillBeltFromInventory()
@@ -89,7 +89,7 @@ func InRunReturnTownRoutine() error {
 	step.SetSkill(skill.Vigor)
 	RecoverCorpse()
 	ctx.PauseIfNotPriority() // Check after RecoverCorpse
-	ManageBelt()
+	ConsumeMisplacedPotionsInBelt()
 	ctx.PauseIfNotPriority() // Check after ManageBelt
 	RefillBeltFromInventory()
 	ctx.PauseIfNotPriority() // Check after RefillBeltFromInventory
