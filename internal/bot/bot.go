@@ -245,22 +245,47 @@ func (b *Bot) Run(ctx context.Context, firstRun bool, runs []run.Run) error {
 				}
 				action.BuffIfRequired()
 
-				_, healingPotsFound := b.ctx.Data.Inventory.Belt.GetFirstPotion(data.HealingPotion)
-				_, manaPotsFound := b.ctx.Data.Inventory.Belt.GetFirstPotion(data.ManaPotion)
 				isInTown := b.ctx.Data.PlayerUnit.Area.IsTown()
 
-				// If one type of potion is missing in the belt but can't be found in inventory then it'll go
-				// back to town, otherwise if potions are found in inventory, refill the belt
-				if ((!healingPotsFound && b.ctx.Data.HasPotionInInventory(data.HealingPotion)) || healingPotsFound) &&
-					((!manaPotsFound && b.ctx.Data.HasPotionInInventory(data.ManaPotion)) || manaPotsFound) &&
-					(!healingPotsFound || !manaPotsFound) &&
-					!isInTown {
-					err = action.RefillBeltFromInventory()
+				// Check potions in belt
+				_, healingPotionsFoundInBelt := b.ctx.Data.Inventory.Belt.GetFirstPotion(data.HealingPotion)
+				_, manaPotionsFoundInBelt := b.ctx.Data.Inventory.Belt.GetFirstPotion(data.ManaPotion)
+				_, rejuvPotionsFoundInBelt := b.ctx.Data.Inventory.Belt.GetFirstPotion(data.RejuvenationPotion)
+
+				// Check potions in inventory
+				hasHealingPotionsInInventory := b.ctx.Data.HasPotionInInventory(data.HealingPotion)
+				hasManaPotionsInInventory := b.ctx.Data.HasPotionInInventory(data.ManaPotion)
+				hasRejuvPotionsInInventory := b.ctx.Data.HasPotionInInventory(data.RejuvenationPotion)
+
+				// Check if we actually need each type of potion
+				needHealingPotionsRefill := !healingPotionsFoundInBelt && b.ctx.CharacterCfg.Inventory.BeltColumns.Total(data.HealingPotion) > 0
+				needManaPotionsRefill := !manaPotionsFoundInBelt && b.ctx.CharacterCfg.Inventory.BeltColumns.Total(data.ManaPotion) > 0
+				needRejuvPotionsRefill := !rejuvPotionsFoundInBelt && b.ctx.CharacterCfg.Inventory.BeltColumns.Total(data.RejuvenationPotion) > 0
+
+				// Determine if we should refill for each type based on availability in inventory
+				shouldRefillHealingPotions := needHealingPotionsRefill && hasHealingPotionsInInventory
+				shouldRefillManaPotions := needManaPotionsRefill && hasManaPotionsInInventory
+				shouldRefillRejuvPotions := needRejuvPotionsRefill && hasRejuvPotionsInInventory
+
+				// Refill belt if:
+				// 1. Each potion type (healing/mana) is either already in belt or needed and available in inventory
+				// 2. And at least one potion type actually needs refilling
+				// Note: If one type (healing/mana) can be refilled but the other cannot, we skip refill and go to town instead
+				// 3. BUT will refill in any case if rejuvenation potions are needed and available in inventory
+				shouldRefillBelt := ((shouldRefillHealingPotions || healingPotionsFoundInBelt) &&
+					(shouldRefillManaPotions || manaPotionsFoundInBelt) &&
+					(needHealingPotionsRefill || needManaPotionsRefill)) || shouldRefillRejuvPotions
+
+				if shouldRefillBelt && !isInTown {
+					action.ConsumeMisplacedPotionsInBelt()
+					action.RefillBeltFromInventory()
 					b.ctx.RefreshGameData()
 
 					// Recheck potions in belt after refill
-					_, healingPotsFound = b.ctx.Data.Inventory.Belt.GetFirstPotion(data.HealingPotion)
-					_, manaPotsFound = b.ctx.Data.Inventory.Belt.GetFirstPotion(data.ManaPotion)
+					_, healingPotionsFoundInBelt = b.ctx.Data.Inventory.Belt.GetFirstPotion(data.HealingPotion)
+					_, manaPotionsFoundInBelt = b.ctx.Data.Inventory.Belt.GetFirstPotion(data.ManaPotion)
+					needHealingPotionsRefill = !healingPotionsFoundInBelt && b.ctx.CharacterCfg.Inventory.BeltColumns.Total(data.HealingPotion) > 0
+					needManaPotionsRefill = !manaPotionsFoundInBelt && b.ctx.CharacterCfg.Inventory.BeltColumns.Total(data.ManaPotion) > 0
 				}
 
 				// Check if we need to go back to town (level, gold, and TP quantity are met, AND then other conditions)
@@ -275,19 +300,19 @@ func (b *Bot) Run(ctx context.Context, firstRun bool, runs []run.Run) error {
 							(b.ctx.Data.PlayerUnit.TotalPlayerGold() > 1000 && lvl.Value < 20) ||
 							(b.ctx.Data.PlayerUnit.TotalPlayerGold() > 5000 && lvl.Value >= 20) {
 
-							if (b.ctx.CharacterCfg.BackToTown.NoHpPotions && !healingPotsFound ||
+							if (b.ctx.CharacterCfg.BackToTown.NoHpPotions && needHealingPotionsRefill ||
 								b.ctx.CharacterCfg.BackToTown.EquipmentBroken && action.IsEquipmentBroken() ||
-								b.ctx.CharacterCfg.BackToTown.NoMpPotions && !manaPotsFound ||
+								b.ctx.CharacterCfg.BackToTown.NoMpPotions && needManaPotionsRefill ||
 								b.ctx.CharacterCfg.BackToTown.MercDied && b.ctx.Data.MercHPPercent() <= 0 && b.ctx.CharacterCfg.Character.UseMerc) &&
 								!b.ctx.Data.PlayerUnit.Area.IsTown() {
 
 								// Log the exact reason for going back to town
 								var reason string
-								if b.ctx.CharacterCfg.BackToTown.NoHpPotions && !healingPotsFound {
+								if b.ctx.CharacterCfg.BackToTown.NoHpPotions && needHealingPotionsRefill {
 									reason = "No healing potions found"
 								} else if b.ctx.CharacterCfg.BackToTown.EquipmentBroken && action.RepairRequired() {
 									reason = "Equipment broken"
-								} else if b.ctx.CharacterCfg.BackToTown.NoMpPotions && !manaPotsFound {
+								} else if b.ctx.CharacterCfg.BackToTown.NoMpPotions && needManaPotionsRefill {
 									reason = "No mana potions found"
 								} else if b.ctx.CharacterCfg.BackToTown.MercDied && b.ctx.Data.MercHPPercent() <= 0 && b.ctx.CharacterCfg.Character.UseMerc {
 									reason = "Mercenary is dead"
