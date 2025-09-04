@@ -24,10 +24,10 @@ import (
 
 type Bot struct {
 	ctx                   *botCtx.Context
-	lastActivityTimeMux   sync.Mutex 
-	lastActivityTime      time.Time 
-	lastKnownPosition     data.Position 
-	lastPositionCheckTime time.Time 
+	lastActivityTimeMux   sync.Mutex
+	lastActivityTime      time.Time
+	lastKnownPosition     data.Position
+	lastPositionCheckTime time.Time
 }
 
 // calculateDistance returns the Euclidean distance between two positions.
@@ -36,7 +36,6 @@ func calculateDistance(p1, p2 data.Position) float64 {
 	dy := float64(p1.Y - p2.Y)
 	return math.Sqrt(dx*dx + dy*dy)
 }
-
 
 func (b *Bot) NeedsTPsToContinue() bool {
 	portalTome, found := b.ctx.Data.Inventory.Find(item.TomeOfTownPortal, item.LocationInventory)
@@ -52,12 +51,11 @@ func (b *Bot) NeedsTPsToContinue() bool {
 func NewBot(ctx *botCtx.Context) *Bot {
 	return &Bot{
 		ctx:                   ctx,
-		lastActivityTime:      time.Now(), // Initialize
+		lastActivityTime:      time.Now(),      // Initialize
 		lastKnownPosition:     data.Position{}, // Will be updated on first game data refresh
-		lastPositionCheckTime: time.Now(),    // Initialize
+		lastPositionCheckTime: time.Now(),      // Initialize
 	}
 }
-
 
 func (b *Bot) updateActivityAndPosition() {
 	b.lastActivityTimeMux.Lock()
@@ -130,7 +128,7 @@ func (b *Bot) Run(ctx context.Context, firstRun bool, runs []run.Run) error {
 		ticker := time.NewTicker(100 * time.Millisecond)
 
 		const globalLongTermIdleThreshold = 2 * time.Minute // From move.go example
-		const minMovementThreshold = 30                    // From move.go example
+		const minMovementThreshold = 30                     // From move.go example
 
 		for {
 			select {
@@ -249,9 +247,23 @@ func (b *Bot) Run(ctx context.Context, firstRun bool, runs []run.Run) error {
 
 				_, healingPotsFound := b.ctx.Data.Inventory.Belt.GetFirstPotion(data.HealingPotion)
 				_, manaPotsFound := b.ctx.Data.Inventory.Belt.GetFirstPotion(data.ManaPotion)
+				isInTown := b.ctx.Data.PlayerUnit.Area.IsTown()
+
+				// If one type of potion is missing in the belt but can't be found in inventory then it'll go
+				// back to town, otherwise if potions are found in inventory, refill the belt
+				if ((!healingPotsFound && b.ctx.Data.HasPotionInInventory(data.HealingPotion)) || healingPotsFound) &&
+					((!manaPotsFound && b.ctx.Data.HasPotionInInventory(data.ManaPotion)) || manaPotsFound) &&
+					(!healingPotsFound || !manaPotsFound) &&
+					!isInTown {
+					err = action.RefillBeltFromInventory()
+					b.ctx.RefreshGameData()
+
+					// Recheck potions in belt after refill
+					_, healingPotsFound = b.ctx.Data.Inventory.Belt.GetFirstPotion(data.HealingPotion)
+					_, manaPotsFound = b.ctx.Data.Inventory.Belt.GetFirstPotion(data.ManaPotion)
+				}
 
 				// Check if we need to go back to town (level, gold, and TP quantity are met, AND then other conditions)
-
 				if _, found := b.ctx.Data.KeyBindings.KeyBindingForSkill(skill.TomeOfTownPortal); found {
 
 					lvl, _ := b.ctx.Data.PlayerUnit.FindStat(stat.Level, 0)
@@ -342,9 +354,9 @@ func (b *Bot) Run(ctx context.Context, firstRun bool, runs []run.Run) error {
 					case errors.Is(err, errors.New("bot globally idle for too long (no movement), quitting game")): // Match the specific error for movement-based idle
 						runFinishReason = event.FinishedError
 					case errors.Is(err, errors.New("player stuck in an unrecoverable movement loop, quitting")): // Match the specific error for movement-based idle
-						runFinishReason = event.FinishedError	
+						runFinishReason = event.FinishedError
 					case errors.Is(err, action.ErrFailedToEquip): // This is the new line
-					runFinishReason = event.FinishedError	
+						runFinishReason = event.FinishedError
 					default:
 						runFinishReason = event.FinishedError
 					}
