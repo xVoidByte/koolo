@@ -1,6 +1,8 @@
 package run
 
 import (
+	"fmt"
+
 	"github.com/hectorgimenez/d2go/pkg/data"
 	"github.com/hectorgimenez/d2go/pkg/data/area"
 	"github.com/hectorgimenez/d2go/pkg/data/difficulty"
@@ -8,7 +10,9 @@ import (
 	"github.com/hectorgimenez/d2go/pkg/data/npc"
 	"github.com/hectorgimenez/d2go/pkg/data/object"
 	"github.com/hectorgimenez/d2go/pkg/data/quest"
+	"github.com/hectorgimenez/d2go/pkg/data/skill"
 	"github.com/hectorgimenez/d2go/pkg/data/stat"
+	"github.com/hectorgimenez/d2go/pkg/memory"
 	"github.com/hectorgimenez/koolo/internal/action"
 	"github.com/hectorgimenez/koolo/internal/action/step"
 	"github.com/hectorgimenez/koolo/internal/config"
@@ -38,6 +42,71 @@ func (a Leveling) act2() error {
 
 	action.VendorRefill(true, true)
 
+	// Frozen Aura Merc can be hired only in Nightmare difficulty
+	if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && a.ctx.Data.MercHPPercent() > 0 && a.ctx.CharacterCfg.Character.ShouldHireAct2MercFrozenAura {
+		a.ctx.Logger.Info("Start Hiring merc with Frozen Aura")
+
+		a.ctx.Logger.Info("Un-equipping merc")
+		if err := action.UnEquipMercenary(); err != nil {
+			a.ctx.Logger.Error(fmt.Sprintf("Failed to unequip mercenary: %s", err.Error()))
+			return err
+		}
+
+		// merc list works only in legacy mode
+		if !a.ctx.Data.LegacyGraphics {
+			a.ctx.Logger.Info("Switching to legacy mode to hire merc")
+			a.ctx.HID.PressKey(a.ctx.Data.KeyBindings.LegacyToggle.Key1[0])
+			utils.Sleep(500)
+		}
+
+		a.ctx.Logger.Info("Interacting with mercenary NPC")
+		if err := action.InteractNPC(town.GetTownByArea(a.ctx.Data.PlayerUnit.Area).MercContractorNPC()); err != nil {
+			return err
+		}
+		a.ctx.HID.KeySequence(win.VK_HOME, win.VK_DOWN, win.VK_RETURN)
+		utils.Sleep(2000)
+
+		a.ctx.Logger.Info("Getting merc list")
+		mercList := a.ctx.GameReader.GetMercList()
+
+		// get the first with fronzen aura
+		var mercToHire *memory.MercOption
+		for i := range mercList {
+			if mercList[i].Skill.ID == skill.HolyFreeze {
+				mercToHire = &mercList[i]
+				break
+			}
+		}
+
+		if mercToHire == nil {
+			a.ctx.Logger.Info("No merc with Frozen Aura found, cannot hire")
+			return nil
+		}
+
+		a.ctx.Logger.Info(fmt.Sprintf("Hiring merc: %s with skill %s", mercToHire.Name, mercToHire.Skill.Name))
+		keySequence := []byte{win.VK_HOME}
+		for i := 0; i < mercToHire.Index; i++ {
+			keySequence = append(keySequence, win.VK_DOWN)
+		}
+		keySequence = append(keySequence, win.VK_RETURN, win.VK_UP, win.VK_RETURN) // Select merc and confirm hire
+		a.ctx.HID.KeySequence(keySequence...)
+
+		a.ctx.CharacterCfg.Character.ShouldHireAct2MercFrozenAura = false
+
+		if !a.ctx.CharacterCfg.ClassicMode && a.ctx.Data.LegacyGraphics {
+			a.ctx.Logger.Info("Switching back to non-legacy mode")
+			a.ctx.HID.PressKey(a.ctx.Data.KeyBindings.LegacyToggle.Key1[0])
+			utils.Sleep(500)
+		}
+
+		if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
+			a.ctx.Logger.Error(fmt.Sprintf("Failed to save character configuration: %s", err.Error()))
+		}
+
+		a.ctx.Logger.Info("Merc hired successfully, re-equipping merc")
+		action.AutoEquip()
+	}
+
 	// Priority 0: Check if Act 2 is fully completed (Seven Tombs quest completed)
 	if a.ctx.Data.Quests[quest.Act2TheSevenTombs].Completed() {
 		a.ctx.Logger.Info("Act 2, The Seven Tombs quest completed. Moving to Act 3.")
@@ -62,9 +131,7 @@ func (a Leveling) act2() error {
 	}
 
 	if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Normal && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 10000 {
-
 		return NewQuests().killRadamentQuest()
-
 	}
 
 	if a.ctx.Data.Quests[quest.Act2TheSevenTombs].HasStatus(quest.StatusInProgress6) {
