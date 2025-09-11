@@ -388,19 +388,24 @@ func equipBestItems(itemsByLoc map[item.LocationType][]data.Item, target item.Lo
 	equippedSomething := false
 
 	for loc, items := range itemsByLoc {
-		if len(items) == 0 {
+		// Find the best item for this slot that is not already equipped in ANOTHER slot.
+		var bestCandidate data.Item
+		foundCandidate := false
+		for _, itm := range items { // Changed "item" to "itm" here
+			// A valid candidate is an item that is not equipped, OR is already equipped in the current slot we are checking.
+			if itm.Location.LocationType != item.LocationEquipped || itm.Location.BodyLocation == loc { // And here
+				bestCandidate = itm // And here
+				foundCandidate = true
+				break
+			}
+		}
+
+		// If no suitable item was found (e.g., all good items are equipped in other slots)
+		if !foundCandidate {
 			continue
 		}
 
-		bestItem := items[0]
-
-		// NEW CHECK: If the best item is already equipped, but in a DIFFERENT slot, skip it.
-		// This prevents swap attempts, which the current logic doesn't support.
-		if bestItem.Location.LocationType == item.LocationEquipped && bestItem.Location.BodyLocation != loc {
-			continue
-		}
-
-		// Check if the best item is already equipped in the CURRENT slot
+		// Check if the best candidate is already equipped in the current slot
 		var currentlyEquipped data.Item
 		if target == item.LocationEquipped {
 			currentlyEquipped = GetEquippedItem(ctx.Data.Inventory, loc)
@@ -408,15 +413,15 @@ func equipBestItems(itemsByLoc map[item.LocationType][]data.Item, target item.Lo
 			currentlyEquipped = GetMercEquippedItem(ctx.Data.Inventory, loc)
 		}
 
-		if currentlyEquipped.UnitID != 0 && bestItem.UnitID == currentlyEquipped.UnitID {
+		if currentlyEquipped.UnitID != 0 && bestCandidate.UnitID == currentlyEquipped.UnitID {
 			continue // Already equipped the best item
 		}
 
 		// Attempting to equip the best item
-		ctx.Logger.Info(fmt.Sprintf("Attempting to equip %s to %s", bestItem.IdentifiedName, loc))
-		err := equip(bestItem, loc, target)
+		ctx.Logger.Info(fmt.Sprintf("Attempting to equip %s to %s", bestCandidate.IdentifiedName, loc))
+		err := equip(bestCandidate, loc, target)
 		if err == nil {
-			ctx.Logger.Info(fmt.Sprintf("Successfully equipped %s to %s", bestItem.IdentifiedName, loc))
+			ctx.Logger.Info(fmt.Sprintf("Successfully equipped %s to %s", bestCandidate.IdentifiedName, loc))
 			equippedSomething = true
 			*ctx.Data = ctx.GameReader.GetData() // Refresh data after a successful equip
 			continue                             // Move to the next location
@@ -434,12 +439,12 @@ func equipBestItems(itemsByLoc map[item.LocationType][]data.Item, target item.Lo
 			}
 
 			// Lock the new item
-			if bestItem.Location.LocationType == item.LocationInventory {
-				w, h := bestItem.Desc().InventoryWidth, bestItem.Desc().InventoryHeight
+			if bestCandidate.Location.LocationType == item.LocationInventory {
+				w, h := bestCandidate.Desc().InventoryWidth, bestCandidate.Desc().InventoryHeight
 				for j := 0; j < h; j++ {
 					for i := 0; i < w; i++ {
-						if bestItem.Position.Y+j < 4 && bestItem.Position.X+i < 10 {
-							tempLock[bestItem.Position.Y+j][bestItem.Position.X+i] = 0 // Lock this slot
+						if bestCandidate.Position.Y+j < 4 && bestCandidate.Position.X+i < 10 {
+							tempLock[bestCandidate.Position.Y+j][bestCandidate.Position.X+i] = 0 // Lock this slot
 						}
 					}
 				}
@@ -454,11 +459,159 @@ func equipBestItems(itemsByLoc map[item.LocationType][]data.Item, target item.Lo
 		}
 
 		// For other errors, log it and continue to the next item slot
-		ctx.Logger.Error(fmt.Sprintf("Failed to equip %s to %s: %v", bestItem.IdentifiedName, loc, err))
+		ctx.Logger.Error(fmt.Sprintf("Failed to equip %s to %s: %v", bestCandidate.IdentifiedName, loc, err))
 	}
 
 	return equippedSomething, nil
 }
+
+
+func getBodyLocationScreenCoords(bodyloc item.LocationType) (data.Position, error) {
+	ctx := context.Get()
+	if ctx.Data.LegacyGraphics {
+		switch bodyloc {
+		case item.LocHead:
+			return data.Position{X: ui.EquipHeadClassicX, Y: ui.EquipHeadClassicY}, nil
+		case item.LocNeck:
+			return data.Position{X: ui.EquipNeckClassicX, Y: ui.EquipNeckClassicY}, nil
+		case item.LocLeftArm:
+			return data.Position{X: ui.EquipLArmClassicX, Y: ui.EquipLArmClassicY}, nil
+		case item.LocRightArm:
+			return data.Position{X: ui.EquipRArmClassicX, Y: ui.EquipRArmClassicY}, nil
+		case item.LocTorso:
+			return data.Position{X: ui.EquipTorsClassicX, Y: ui.EquipTorsClassicY}, nil
+		case item.LocBelt:
+			return data.Position{X: ui.EquipBeltClassicX, Y: ui.EquipBeltClassicY}, nil
+		case item.LocGloves:
+			return data.Position{X: ui.EquipGlovClassicX, Y: ui.EquipGlovClassicY}, nil
+		case item.LocFeet:
+			return data.Position{X: ui.EquipFeetClassicX, Y: ui.EquipFeetClassicY}, nil
+		case item.LocLeftRing:
+			return data.Position{X: ui.EquipLRinClassicX, Y: ui.EquipLRinClassicY}, nil
+		case item.LocRightRing:
+			return data.Position{X: ui.EquipRRinClassicX, Y: ui.EquipRRinClassicY}, nil
+		default:
+			return data.Position{}, fmt.Errorf("legacy coordinates for %s not defined.", bodyloc)
+		}
+	}
+	switch bodyloc {
+	case item.LocHead:
+		return data.Position{X: ui.EquipHeadX, Y: ui.EquipHeadY}, nil
+	case item.LocNeck:
+		return data.Position{X: ui.EquipNeckX, Y: ui.EquipNeckY}, nil
+	case item.LocLeftArm:
+		return data.Position{X: ui.EquipLArmX, Y: ui.EquipLArmY}, nil
+	case item.LocRightArm:
+		return data.Position{X: ui.EquipRArmX, Y: ui.EquipRArmY}, nil
+	case item.LocTorso:
+		return data.Position{X: ui.EquipTorsX, Y: ui.EquipTorsY}, nil
+	case item.LocBelt:
+		return data.Position{X: ui.EquipBeltX, Y: ui.EquipBeltY}, nil
+	case item.LocGloves:
+		return data.Position{X: ui.EquipGlovX, Y: ui.EquipGlovY}, nil
+	case item.LocFeet:
+		return data.Position{X: ui.EquipFeetX, Y: ui.EquipFeetY}, nil
+	case item.LocLeftRing:
+		return data.Position{X: ui.EquipLRinX, Y: ui.EquipLRinY}, nil
+	case item.LocRightRing:
+		return data.Position{X: ui.EquipRRinX, Y: ui.EquipRRinY}, nil
+	default:
+		return data.Position{}, fmt.Errorf("coordinates for slot %s not defined. ", bodyloc)
+	}
+}
+
+
+func equipBestRings(itemsByLoc map[item.LocationType][]data.Item) (bool, error) {
+	ctx := context.Get()
+
+	allRingsMap := make(map[data.UnitID]data.Item)
+	for _, ring := range itemsByLoc[item.LocLeftRing] {
+		allRingsMap[ring.UnitID] = ring
+	}
+	for _, ring := range itemsByLoc[item.LocRightRing] {
+		allRingsMap[ring.UnitID] = ring
+	}
+
+	var allRings []data.Item
+	for _, ring := range allRingsMap {
+		allRings = append(allRings, ring)
+	}
+
+	sort.Slice(allRings, func(i, j int) bool {
+
+		scoreI := PlayerScore(allRings[i])[item.LocLeftRing]
+		scoreJ := PlayerScore(allRings[j])[item.LocLeftRing]
+		return scoreI > scoreJ
+	})
+
+	if len(allRings) == 0 {
+		return false, nil 
+	}
+
+	bestRing := allRings[0]
+	var secondBestRing data.Item
+	if len(allRings) > 1 {
+		secondBestRing = allRings[1]
+	}
+
+	leftEquipped := GetEquippedItem(ctx.Data.Inventory, item.LocLeftRing)
+	rightEquipped := GetEquippedItem(ctx.Data.Inventory, item.LocRightRing)
+
+	equippedRings := []data.Item{leftEquipped, rightEquipped}
+	idealIDs := map[data.UnitID]bool{
+		bestRing.UnitID: true,
+	}
+	if secondBestRing.UnitID != 0 {
+		idealIDs[secondBestRing.UnitID] = true
+	}
+
+	var ringToReplace data.Item
+	for _, equipped := range equippedRings {
+		if equipped.UnitID != 0 && !idealIDs[equipped.UnitID] {
+			ringToReplace = equipped
+			break 
+		}
+	}
+
+	if ringToReplace.UnitID != 0 {
+		var replacementRing data.Item
+		if bestRing.UnitID != leftEquipped.UnitID && bestRing.UnitID != rightEquipped.UnitID {
+			replacementRing = bestRing
+		} else if secondBestRing.UnitID != 0 && (secondBestRing.UnitID != leftEquipped.UnitID && secondBestRing.UnitID != rightEquipped.UnitID) {
+			replacementRing = secondBestRing
+		}
+
+		if replacementRing.UnitID != 0 {
+			ctx.Logger.Info(fmt.Sprintf("Replacing ring %s with %s.", ringToReplace.IdentifiedName, replacementRing.IdentifiedName))
+			err := equip(replacementRing, ringToReplace.Location.BodyLocation, item.LocationEquipped)
+			if err != nil {
+				return false, fmt.Errorf("failed to equip ring: %w", err)
+			}
+			return true, nil
+		}
+	}
+
+	if leftEquipped.UnitID == 0 {
+		if bestRing.UnitID != rightEquipped.UnitID {
+			ctx.Logger.Info(fmt.Sprintf("Equipping best ring %s in empty left slot.", bestRing.IdentifiedName))
+			if err := equip(bestRing, item.LocLeftRing, item.LocationEquipped); err == nil {
+				return true, nil
+			}
+		}
+	}
+	if rightEquipped.UnitID == 0 {
+		if secondBestRing.UnitID != 0 && secondBestRing.UnitID != leftEquipped.UnitID {
+			ctx.Logger.Info(fmt.Sprintf("Equipping second best ring %s in empty right slot.", secondBestRing.IdentifiedName))
+			if err := equip(secondBestRing, item.LocRightRing, item.LocationEquipped); err == nil {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
+}
+
+
 
 // equip handles the physical process of equipping an item. Returns ErrNotEnoughSpace if it fails.
 func equip(itm data.Item, bodyloc item.LocationType, target item.LocationType) error {
@@ -466,7 +619,7 @@ func equip(itm data.Item, bodyloc item.LocationType, target item.LocationType) e
 	ctx.SetLastAction("Equip")
 	defer step.CloseAllMenus()
 
-	// Move item from stash to inventory if needed (do this only once)
+	// Move item from stash to inventory if needed
 	if itm.Location.LocationType == item.LocationStash || itm.Location.LocationType == item.LocationSharedStash {
 		OpenStash()
 		utils.Sleep(EquipDelayMS)
@@ -475,11 +628,8 @@ func equip(itm data.Item, bodyloc item.LocationType, target item.LocationType) e
 			tab = itm.Location.Page + 1
 		}
 		SwitchStashTab(tab)
-
 		ctx.HID.ClickWithModifier(game.LeftButton, ui.GetScreenCoordsForItem(itm).X, ui.GetScreenCoordsForItem(itm).Y, game.CtrlKey)
 		utils.Sleep(EquipDelayMS)
-		
-		// We need to refresh data and find the item in inventory now
 		*ctx.Data = ctx.GameReader.GetData()
 		var found bool
 		for _, updatedItem := range ctx.Data.Inventory.ByLocation(item.LocationInventory) {
@@ -495,40 +645,75 @@ func equip(itm data.Item, bodyloc item.LocationType, target item.LocationType) e
 		step.CloseAllMenus()
 	}
 
-	// Main retry loop to make the entire process more robust
+	// Main retry loop
 	for attempt := 0; attempt < 3; attempt++ {
-		// Ensure inventory is open at the start of each attempt
 		for !ctx.Data.OpenMenus.Inventory {
 			ctx.HID.PressKeyBinding(ctx.Data.KeyBindings.Inventory)
 			utils.Sleep(EquipDelayMS)
 		}
 
-		// Handle mercenary equipment
 		if target == item.LocationMercenary {
 			ctx.HID.PressKeyBinding(ctx.Data.KeyBindings.MercenaryScreen)
 			utils.Sleep(EquipDelayMS)
 			ctx.HID.ClickWithModifier(game.LeftButton, ui.GetScreenCoordsForItem(itm).X, ui.GetScreenCoordsForItem(itm).Y, game.CtrlKey)
-		} else { // Handle player equipment
+		} else { 
 			currentlyEquipped := GetEquippedItem(ctx.Data.Inventory, bodyloc)
-			if currentlyEquipped.UnitID != 0 {
-				_, found := findInventorySpace(currentlyEquipped)
-				if !found {
+			isRingSwap := itm.Desc().Type == "ring" && currentlyEquipped.UnitID != 0
+
+			if isRingSwap {
+				if _, found := findInventorySpace(currentlyEquipped); !found {
 					return ErrNotEnoughSpace
 				}
-			}
 
-			// Use Shift + Left Click to swap the item. The game engine will handle the swap.
-			ctx.HID.ClickWithModifier(game.LeftButton, ui.GetScreenCoordsForItem(itm).X, ui.GetScreenCoordsForItem(itm).Y, game.ShiftKey)
+				ctx.Logger.Info(fmt.Sprintf("Unequipping old ring: %s from %s", currentlyEquipped.IdentifiedName, bodyloc))
+
+				oldRingCoords, err := getBodyLocationScreenCoords(bodyloc)
+				if err != nil {
+					return err 
+				}
+				
+				ctx.HID.ClickWithModifier(game.LeftButton, oldRingCoords.X, oldRingCoords.Y, game.ShiftKey)
+				utils.Sleep(1000)
+				*ctx.Data = ctx.GameReader.GetData()
+
+				itemAfterUnequip := GetEquippedItem(ctx.Data.Inventory, bodyloc)
+				if itemAfterUnequip.UnitID != 0 {
+					ctx.Logger.Warn("Failed to unequip old ring, it is still equipped. Aborting swap.")
+					return fmt.Errorf("failed to unequip old ring from %s", bodyloc)
+				}
+				
+				var newItemInInv data.Item
+				var foundInInv bool
+				for _, invItem := range ctx.Data.Inventory.ByLocation(item.LocationInventory) {
+					if invItem.UnitID == itm.UnitID {
+						newItemInInv = invItem
+						foundInInv = true
+						break
+					}
+				}
+				if !foundInInv {
+					return fmt.Errorf("new ring %s not found in inventory after unequip", itm.IdentifiedName)
+				}
+
+				ctx.Logger.Info(fmt.Sprintf("Equipping new ring: %s", newItemInInv.IdentifiedName))
+				newRingCoords := ui.GetScreenCoordsForItem(newItemInInv)
+				ctx.HID.ClickWithModifier(game.LeftButton, newRingCoords.X, newRingCoords.Y, game.ShiftKey)
+
+			} else { // Standard logic for all other items
+				if currentlyEquipped.UnitID != 0 {
+					if _, found := findInventorySpace(currentlyEquipped); !found {
+						return ErrNotEnoughSpace
+					}
+				}
+				ctx.HID.ClickWithModifier(game.LeftButton, ui.GetScreenCoordsForItem(itm).X, ui.GetScreenCoordsForItem(itm).Y, game.ShiftKey)
+			}
 		}
 
-		// Refresh data before verification starts
+		// Verification loop
 		*ctx.Data = ctx.GameReader.GetData()
-		
-		// Final verification
 		var itemEquipped bool
 		for i := 0; i < 3; i++ {
 			utils.Sleep(800)
-			// Re-fetch data inside the loop to ensure we have the latest info for each check
 			*ctx.Data = ctx.GameReader.GetData()
 			for _, inPlace := range ctx.Data.Inventory.ByLocation(target) {
 				if inPlace.UnitID == itm.UnitID && inPlace.Location.BodyLocation == bodyloc {
@@ -540,19 +725,15 @@ func equip(itm data.Item, bodyloc item.LocationType, target item.LocationType) e
 				break
 			}
 		}
-
 		if itemEquipped {
-			return nil // Success! Exit the function.
+			return nil
 		}
-
-		// If we are here, the attempt failed. The main loop will try again.
 		ctx.Logger.Debug(fmt.Sprintf("Equip attempt %d failed, retrying...", attempt+1))
-		utils.Sleep(500) // Small delay before the next attempt
+		utils.Sleep(500)
 	}
-
-	// If all attempts failed, return the final error.
 	return fmt.Errorf("verification failed after all attempts to equip %s", itm.IdentifiedName)
 }
+
 
 // findInventorySpace finds the top-left grid coordinates for a free spot in the inventory.
 func findInventorySpace(itm data.Item) (data.Position, bool) {
