@@ -6,6 +6,7 @@ import (
 	"github.com/hectorgimenez/d2go/pkg/data"
 	"github.com/hectorgimenez/d2go/pkg/data/item"
 	"github.com/hectorgimenez/d2go/pkg/nip"
+	"github.com/hectorgimenez/koolo/internal/action/step"
 	"github.com/hectorgimenez/koolo/internal/context"
 	"github.com/hectorgimenez/koolo/internal/game"
 	"github.com/hectorgimenez/koolo/internal/ui"
@@ -117,4 +118,26 @@ func IsInLockedInventorySlot(itm data.Item) bool {
 
 	// 0 means locked, 1 means unlocked
 	return lockConfig[row][col] == 0
+}
+
+func DrinkAllPotionsInInventory() {
+	ctx := context.Get()
+	ctx.SetLastStep("DrinkPotionsInInventory")
+
+	step.OpenInventory()
+
+	for _, i := range ctx.Data.Inventory.ByLocation(item.LocationInventory) {
+		if i.IsPotion() {
+			if ctx.CharacterCfg.Inventory.InventoryLock[i.Position.Y][i.Position.X] == 0 {
+				continue
+			}
+
+			screenPos := ui.GetScreenCoordsForItem(i)
+			utils.Sleep(100)
+			ctx.HID.Click(game.RightButton, screenPos.X, screenPos.Y)
+			utils.Sleep(200)
+		}
+	}
+
+	step.CloseAllMenus()
 }
