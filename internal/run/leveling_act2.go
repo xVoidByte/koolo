@@ -43,8 +43,9 @@ func (a Leveling) act2() error {
 	action.VendorRefill(true, true)
 
 	// Frozen Aura Merc can be hired only in Nightmare difficulty
-	if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && a.ctx.Data.MercHPPercent() > 0 && a.ctx.CharacterCfg.Character.ShouldHireAct2MercFrozenAura {
+	if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && a.ctx.Data.MercHPPercent() > 0 && a.ctx.CharacterCfg.Character.ShouldHireAct2MercFrozenAura && a.ctx.Data.PlayerUnit.TotalPlayerGold() > 25000 {
 		a.ctx.Logger.Info("Start Hiring merc with Frozen Aura")
+		action.DrinkAllPotionsInInventory()
 
 		a.ctx.Logger.Info("Un-equipping merc")
 		if err := action.UnEquipMercenary(); err != nil {
