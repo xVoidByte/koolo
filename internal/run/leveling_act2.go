@@ -42,8 +42,49 @@ func (a Leveling) act2() error {
 
 	action.VendorRefill(true, true)
 
+	// Priority 0: Check if Act 2 is fully completed (Seven Tombs quest completed)
+	if a.ctx.Data.Quests[quest.Act2TheSevenTombs].Completed() {
+		a.ctx.Logger.Info("Act 2, The Seven Tombs quest completed. Moving to Act 3.")
+		action.MoveToCoords(data.Position{
+			X: 5195,
+			Y: 5060,
+		})
+		action.InteractNPC(npc.Meshif)
+		a.ctx.HID.KeySequence(win.VK_HOME, win.VK_DOWN, win.VK_RETURN)
+		utils.Sleep(1000)
+		a.HoldKey(win.VK_ESCAPE, 2000) // Hold the Escape key (VK_ESCAPE or 0x1B) for 2000 milliseconds (2 seconds)
+		utils.Sleep(1000)
+
+		return nil
+	}
+
+	// Gold Farming Logic (and immediate return if farming is needed)
+	if (a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 50000) ||
+		(a.ctx.CharacterCfg.Game.Difficulty == difficulty.Hell && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 70000) {
+
+		return NewMausoleum().Run()
+	}
+
+	if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Normal && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 10000 {
+		return NewQuests().killRadamentQuest()
+	}
+
+	if a.ctx.Data.Quests[quest.Act2TheSevenTombs].HasStatus(quest.StatusInProgress6) {
+		a.ctx.Logger.Info("Act 2, The Seven Tombs quest completed. Need to talk to Meshif and then move to Act 3.")
+		action.MoveToCoords(data.Position{
+			X: 5195,
+			Y: 5060,
+		})
+		action.InteractNPC(npc.Meshif)
+		a.ctx.HID.KeySequence(win.VK_HOME, win.VK_DOWN, win.VK_RETURN)
+		utils.Sleep(1000)
+		a.HoldKey(win.VK_ESCAPE, 2000) // Hold the Escape key (VK_ESCAPE or 0x1B) for 2000 milliseconds (2 seconds)
+		utils.Sleep(1000)
+		return nil
+	}
+
 	// Frozen Aura Merc can be hired only in Nightmare difficulty
-	if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && a.ctx.Data.MercHPPercent() > 0 && a.ctx.CharacterCfg.Character.ShouldHireAct2MercFrozenAura && a.ctx.Data.PlayerUnit.TotalPlayerGold() > 25000 {
+	if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && a.ctx.Data.MercHPPercent() > 0 && a.ctx.CharacterCfg.Character.ShouldHireAct2MercFrozenAura {
 		a.ctx.Logger.Info("Start Hiring merc with Frozen Aura")
 		action.DrinkAllPotionsInInventory()
 
@@ -106,47 +147,6 @@ func (a Leveling) act2() error {
 
 		a.ctx.Logger.Info("Merc hired successfully, re-equipping merc")
 		action.AutoEquip()
-	}
-
-	// Priority 0: Check if Act 2 is fully completed (Seven Tombs quest completed)
-	if a.ctx.Data.Quests[quest.Act2TheSevenTombs].Completed() {
-		a.ctx.Logger.Info("Act 2, The Seven Tombs quest completed. Moving to Act 3.")
-		action.MoveToCoords(data.Position{
-			X: 5195,
-			Y: 5060,
-		})
-		action.InteractNPC(npc.Meshif)
-		a.ctx.HID.KeySequence(win.VK_HOME, win.VK_DOWN, win.VK_RETURN)
-		utils.Sleep(1000)
-		a.HoldKey(win.VK_ESCAPE, 2000) // Hold the Escape key (VK_ESCAPE or 0x1B) for 2000 milliseconds (2 seconds)
-		utils.Sleep(1000)
-
-		return nil
-	}
-
-	// Gold Farming Logic (and immediate return if farming is needed)
-	if (a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 50000) ||
-		(a.ctx.CharacterCfg.Game.Difficulty == difficulty.Hell && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 70000) {
-
-		return NewMausoleum().Run()
-	}
-
-	if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Normal && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 10000 {
-		return NewQuests().killRadamentQuest()
-	}
-
-	if a.ctx.Data.Quests[quest.Act2TheSevenTombs].HasStatus(quest.StatusInProgress6) {
-		a.ctx.Logger.Info("Act 2, The Seven Tombs quest completed. Need to talk to Meshif and then move to Act 3.")
-		action.MoveToCoords(data.Position{
-			X: 5195,
-			Y: 5060,
-		})
-		action.InteractNPC(npc.Meshif)
-		a.ctx.HID.KeySequence(win.VK_HOME, win.VK_DOWN, win.VK_RETURN)
-		utils.Sleep(1000)
-		a.HoldKey(win.VK_ESCAPE, 2000) // Hold the Escape key (VK_ESCAPE or 0x1B) for 2000 milliseconds (2 seconds)
-		utils.Sleep(1000)
-		return nil
 	}
 
 	// Priority 2: Check if Duriel is defeated but not yet reported (StatusInProgress5)
