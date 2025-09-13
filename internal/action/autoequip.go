@@ -430,7 +430,7 @@ func equipBestItems(itemsByLoc map[item.LocationType][]data.Item, target item.Lo
 		// Handle specific errors
 		if errors.Is(err, ErrNotEnoughSpace) {
 			ctx.Logger.Info("Not enough inventory space to equip. Trying to sell junk.")
-
+			DrinkAllPotionsInInventory()
 			// Create a temporary lock config that protects the item we want to equip
 			tempLock := make([][]int, len(ctx.CharacterCfg.Inventory.InventoryLock))
 			for i := range ctx.CharacterCfg.Inventory.InventoryLock {
@@ -893,4 +893,5 @@ func UnEquipMercenary() error {
 	}
 
 	return nil
+
 }
