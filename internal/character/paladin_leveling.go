@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/hectorgimenez/d2go/pkg/data"
+	"github.com/hectorgimenez/d2go/pkg/data/item"
 	"github.com/hectorgimenez/d2go/pkg/data/npc"
 	"github.com/hectorgimenez/d2go/pkg/data/skill"
 	"github.com/hectorgimenez/d2go/pkg/data/stat"
-	"github.com/hectorgimenez/d2go/pkg/data/item"
 	"github.com/hectorgimenez/koolo/internal/action/step"
 	"github.com/hectorgimenez/koolo/internal/context"
 	"github.com/hectorgimenez/koolo/internal/game"
@@ -202,7 +202,7 @@ func (s PaladinLeveling) SkillsToBind() (skill.ID, []skill.ID) {
 	if found {
 		skillBindings = append(skillBindings, skill.TomeOfTownPortal)
 	}
-	
+
 	if s.Data.PlayerUnit.Skills[skill.Concentration].Level > 0 && lvl.Value >= 18 {
 		skillBindings = append(skillBindings, skill.Concentration)
 	} else {
@@ -225,18 +225,18 @@ func (s PaladinLeveling) StatPoints() []context.StatAllocation {
 
 	// Define target totals (including base stats)
 	targets := []context.StatAllocation{
-		{Stat: stat.Vitality, Points: 30},
-		{Stat: stat.Strength, Points: 30},
-		{Stat: stat.Vitality, Points: 35},
-		{Stat: stat.Strength, Points: 35},
-		{Stat: stat.Vitality, Points: 40},
-		{Stat: stat.Strength, Points: 40},
-		{Stat: stat.Vitality, Points: 50},
-		{Stat: stat.Strength, Points: 80},
-		{Stat: stat.Vitality, Points: 100},
-		{Stat: stat.Strength, Points: 95},
-		{Stat: stat.Vitality, Points: 250},
-		{Stat: stat.Strength, Points: 156},
+		{Stat: stat.Vitality, Points: 30},   // lvl 3
+		{Stat: stat.Strength, Points: 30},   // lvl 4
+		{Stat: stat.Vitality, Points: 35},   // lvl 5
+		{Stat: stat.Strength, Points: 35},   // lvl 6
+		{Stat: stat.Vitality, Points: 40},   // lvl 7
+		{Stat: stat.Strength, Points: 40},   // lvl 8
+		{Stat: stat.Vitality, Points: 50},   // lvl 10
+		{Stat: stat.Strength, Points: 80},   // lvl 16
+		{Stat: stat.Vitality, Points: 100},  // lvl 26
+		{Stat: stat.Strength, Points: 95},   // lvl 29
+		{Stat: stat.Vitality, Points: 205},  // lvl 50
+		{Stat: stat.Dexterity, Points: 100}, // lvl 66
 		{Stat: stat.Vitality, Points: 999},
 	}
 
@@ -350,7 +350,7 @@ func (s PaladinLeveling) KillCountess() error {
 }
 
 func (s PaladinLeveling) KillAndariel() error {
-		s.Logger.Info("Starting Andariel kill sequence...")
+	s.Logger.Info("Starting Andariel kill sequence...")
 	timeout := time.Second * 160
 	startTime := time.Now()
 
@@ -508,7 +508,7 @@ func (s PaladinLeveling) KillIzual() error {
 		if distance > 7 {
 			s.Logger.Debug(fmt.Sprintf("Izual is too far away (%d), moving closer.", distance))
 			step.MoveTo(izual.Position)
-			continue 
+			continue
 		}
 
 		if izual.Stats[stat.Life] <= 0 {
@@ -524,7 +524,7 @@ func (s PaladinLeveling) KillIzual() error {
 			time.Sleep(time.Millisecond * 250)
 		} else {
 			if s.Data.PlayerUnit.Skills[skill.Zeal].Level > 0 {
-				numOfAttacks = 1 
+				numOfAttacks = 1
 			}
 			step.PrimaryAttack(izual.UnitID, numOfAttacks, false, step.Distance(1, 3), step.EnsureAura(skill.HolyFire))
 		}
@@ -544,13 +544,13 @@ func (s PaladinLeveling) KillDiablo() error {
 				s.Logger.Error("Diablo was not found, timeout reached.")
 				return errors.New("diablo not found within the time limit")
 			}
-			time.Sleep(time.Second / 2) 
+			time.Sleep(time.Second / 2)
 			continue
 		}
 
 		if diablo.Stats[stat.Life] <= 0 {
 			s.Logger.Info("Diablo is dead.")
-			return nil 
+			return nil
 		}
 
 		numOfAttacks := 10
@@ -611,13 +611,13 @@ func (s PaladinLeveling) KillBaal() error {
 				s.Logger.Error("Baal was not found, timeout reached.")
 				return errors.New("Baal not found within the time limit")
 			}
-			time.Sleep(time.Second / 2) 
+			time.Sleep(time.Second / 2)
 			continue
 		}
 
 		if baal.Stats[stat.Life] <= 0 {
 			s.Logger.Info("Baal is dead.")
-			return nil 
+			return nil
 		}
 
 		numOfAttacks := 5
