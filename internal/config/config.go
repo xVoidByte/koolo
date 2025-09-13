@@ -111,12 +111,13 @@ type CharacterCfg struct {
 		RejuvPotionCount   int         `yaml:"rejuvPotionCount"`
 	} `yaml:"inventory"`
 	Character struct {
-		Class         string `yaml:"class"`
-		UseMerc       bool   `yaml:"useMerc"`
-		StashToShared bool   `yaml:"stashToShared"`
-		UseTeleport   bool   `yaml:"useTeleport"`
-		ClearPathDist int    `yaml:"clearPathDist"`
-		BerserkerBarb struct {
+		Class                        string `yaml:"class"`
+		UseMerc                      bool   `yaml:"useMerc"`
+		StashToShared                bool   `yaml:"stashToShared"`
+		UseTeleport                  bool   `yaml:"useTeleport"`
+		ClearPathDist                int    `yaml:"clearPathDist"`
+		ShouldHireAct2MercFrozenAura bool   `yaml:"shouldHireAct2MercFrozenAura"`
+		BerserkerBarb                struct {
 			FindItemSwitch              bool `yaml:"find_item_switch"`
 			SkipPotionPickupInTravincal bool `yaml:"skip_potion_pickup_in_travincal"`
 		} `yaml:"berserker_barb"`

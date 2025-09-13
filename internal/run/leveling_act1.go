@@ -200,6 +200,7 @@ func (a Leveling) setupLevelOneConfig() {
 	if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
 		a.ctx.Logger.Error(fmt.Sprintf("Failed to save character configuration: %s", err.Error()))
 	}
+	a.ctx.CharacterCfg.Character.ShouldHireAct2MercFrozenAura = true
 }
 
 // adjustDifficultyConfig centralizes difficulty-based configuration changes.
