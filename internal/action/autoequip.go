@@ -292,19 +292,14 @@ func isAct2MercenaryPresent(mercName npc.ID) bool {
 	return false
 }
 
-// evaluateItems processes items for either player or merc
 func evaluateItems(items []data.Item, target item.LocationType, scoreFunc func(data.Item) map[item.LocationType]float64) map[item.LocationType][]data.Item {
 	ctx := context.Get()
 	itemsByLoc := make(map[item.LocationType][]data.Item)
 	itemScores := make(map[data.UnitID]map[item.LocationType]float64)
 
 	for _, itm := range items {
-		// Exclude Keys from being equipped
-		if itm.Name == item.Key {
-			continue
-		}
-
-		if itm.Desc().Name == "Bolts" || itm.Desc().Name == "Arrows" || itm.Desc().Type == "thro" || itm.Desc().Type == "thrq" || itm.Desc().Type == "tkni" || itm.Desc().Type == "taxe" || itm.Desc().Type == "tpot" {
+		// Exclude items that should not be equipped
+		if itm.Name == item.Key || slices.Contains([]string{"Bolts", "Arrows", "thro", "thrq", "tkni", "taxe", "tpot"}, itm.Desc().Type) {
 			continue
 		}
 
@@ -316,11 +311,7 @@ func evaluateItems(items []data.Item, target item.LocationType, scoreFunc func(d
 			}
 
 			for bodyLoc, score := range bodyLocScores {
-				if !isEquippable(itm, bodyLoc, target) {
-					continue
-				}
-
-				if !isValidLocation(itm, bodyLoc, target) {
+				if !isEquippable(itm, bodyLoc, target) || !isValidLocation(itm, bodyLoc, target) {
 					continue
 				}
 
@@ -345,37 +336,53 @@ func evaluateItems(items []data.Item, target item.LocationType, scoreFunc func(d
 		ctx.Logger.Debug("**********************************")
 	}
 
-	// "Best Combo" logic for Two-Handed Weapons
+	// "Best Combo" logic for Two-Handed Weapons - REVISED LOGIC
 	if target == item.LocationEquipped {
-		class := ctx.Data.PlayerUnit.Class
-
-		if items, ok := itemsByLoc[item.LocLeftArm]; ok && len(items) > 0 {
-			if _, found := items[0].FindStat(stat.TwoHandedMinDamage, 0); found {
-				if class != data.Barbarian || items[0].Desc().Type != "swor" {
-					var bestComboScore float64
-					for _, itm := range items {
-						if _, isTwoHanded := itm.FindStat(stat.TwoHandedMinDamage, 0); !isTwoHanded {
-							if score, exists := itemScores[itm.UnitID][item.LocLeftArm]; exists {
-								ctx.Logger.Debug(fmt.Sprintf("Best one-handed weapon score: %.1f", score))
-								bestComboScore = score
-								break
-							}
-						}
-					}
-
-					if rightArmItems, ok := itemsByLoc[item.LocRightArm]; ok && len(rightArmItems) > 0 {
-						if score, exists := itemScores[rightArmItems[0].UnitID][item.LocRightArm]; exists {
-							ctx.Logger.Debug(fmt.Sprintf("Best shield score: %.1f", score))
-							bestComboScore += score
-							ctx.Logger.Debug(fmt.Sprintf("Best one-hand + shield combo score: %.1f", bestComboScore))
-						}
-					}
-
-					if twoHandedScore, exists := itemScores[items[0].UnitID][item.LocLeftArm]; exists && bestComboScore >= twoHandedScore {
-						ctx.Logger.Debug(fmt.Sprintf("Removing two-handed weapon: %s", items[0].IdentifiedName))
-						itemsByLoc[item.LocLeftArm] = itemsByLoc[item.LocLeftArm][1:]
-					}
+		// Find the best two-handed weapon
+		var bestTwoHanded data.Item
+		if items, ok := itemsByLoc[item.LocLeftArm]; ok {
+			for _, itm := range items {
+				if _, isTwoHanded := itm.FindStat(stat.TwoHandedMinDamage, 0); isTwoHanded {
+					bestTwoHanded = itm
+					break
 				}
+			}
+		}
+
+		// Find the best one-handed weapon + shield combo
+		var bestOneHanded data.Item
+		if items, ok := itemsByLoc[item.LocLeftArm]; ok {
+			for _, itm := range items {
+				if _, isTwoHanded := itm.FindStat(stat.TwoHandedMinDamage, 0); !isTwoHanded {
+					bestOneHanded = itm
+					break
+				}
+			}
+		}
+
+		var bestShield data.Item
+		if items, ok := itemsByLoc[item.LocRightArm]; ok {
+			bestShield = items[0]
+		}
+
+		// Calculate scores
+		twoHandedScore := itemScores[bestTwoHanded.UnitID][item.LocLeftArm]
+		comboScore := itemScores[bestOneHanded.UnitID][item.LocLeftArm] + itemScores[bestShield.UnitID][item.LocRightArm]
+
+		// Make a definitive choice between the two configurations
+		if bestTwoHanded.UnitID != 0 && twoHandedScore > comboScore {
+			// Two-handed weapon is better, so remove all other options
+			ctx.Logger.Debug(fmt.Sprintf("Choosing %s (2H) over combo.", bestTwoHanded.IdentifiedName))
+			itemsByLoc[item.LocLeftArm] = []data.Item{bestTwoHanded}
+			delete(itemsByLoc, item.LocRightArm)
+		} else if bestOneHanded.UnitID != 0 || bestShield.UnitID != 0 {
+			// Combo is better, so remove the two-handed weapon and select best combo items
+			ctx.Logger.Debug(fmt.Sprintf("Choosing combo over %s (2H).", bestTwoHanded.IdentifiedName))
+			if bestOneHanded.UnitID != 0 {
+				itemsByLoc[item.LocLeftArm] = []data.Item{bestOneHanded}
+			}
+			if bestShield.UnitID != 0 {
+				itemsByLoc[item.LocRightArm] = []data.Item{bestShield}
 			}
 		}
 	}
