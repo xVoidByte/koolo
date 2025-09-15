@@ -28,13 +28,13 @@ var (
 	ErrNotEnoughSpace = errors.New("not enough inventory space")
 
 	classItems = map[data.Class][]string{
-		data.Amazon:      {"ajav", "abow", "aspe"},
-		data.Sorceress:   {"orb"},
+		data.Amazon:     {"ajav", "abow", "aspe"},
+		data.Sorceress:  {"orb"},
 		data.Necromancer: {"head"},
-		data.Paladin:     {"ashd"},
-		data.Barbarian:   {"phlm"},
-		data.Druid:       {"pelt"},
-		data.Assassin:    {"h2h"},
+		data.Paladin:    {"ashd"},
+		data.Barbarian:  {"phlm"},
+		data.Druid:      {"pelt"},
+		data.Assassin:   {"h2h"},
 	}
 
 	// shieldTypes defines items that should be equipped in right arm (technically they can be left or right arm but we don't want to try and equip two shields)
@@ -51,7 +51,6 @@ var (
 		"HoradricStaff",
 		"AmuletOfTheViper",
 		"KhalimsFlail",
-		"KhalimsWill",
 	}
 )
 
@@ -292,14 +291,19 @@ func isAct2MercenaryPresent(mercName npc.ID) bool {
 	return false
 }
 
+// evaluateItems processes items for either player or merc
 func evaluateItems(items []data.Item, target item.LocationType, scoreFunc func(data.Item) map[item.LocationType]float64) map[item.LocationType][]data.Item {
 	ctx := context.Get()
 	itemsByLoc := make(map[item.LocationType][]data.Item)
 	itemScores := make(map[data.UnitID]map[item.LocationType]float64)
 
 	for _, itm := range items {
-		// Exclude items that should not be equipped
-		if itm.Name == item.Key || slices.Contains([]string{"Bolts", "Arrows", "thro", "thrq", "tkni", "taxe", "tpot"}, itm.Desc().Type) {
+		// Exclude Keys from being equipped
+		if itm.Name == item.Key {
+			continue
+		}
+
+		if itm.Desc().Name == "Bolts" || itm.Desc().Name == "Arrows" || itm.Desc().Type == "thro" || itm.Desc().Type == "thrq" || itm.Desc().Type == "tkni" || itm.Desc().Type == "taxe" || itm.Desc().Type == "tpot" {
 			continue
 		}
 
@@ -311,7 +315,11 @@ func evaluateItems(items []data.Item, target item.LocationType, scoreFunc func(d
 			}
 
 			for bodyLoc, score := range bodyLocScores {
-				if !isEquippable(itm, bodyLoc, target) || !isValidLocation(itm, bodyLoc, target) {
+				if !isEquippable(itm, bodyLoc, target) {
+					continue
+				}
+
+				if !isValidLocation(itm, bodyLoc, target) {
 					continue
 				}
 
@@ -336,56 +344,45 @@ func evaluateItems(items []data.Item, target item.LocationType, scoreFunc func(d
 		ctx.Logger.Debug("**********************************")
 	}
 
-	// "Best Combo" logic for Two-Handed Weapons - REVISED LOGIC
-	if target == item.LocationEquipped {
-		// Find the best two-handed weapon
-		var bestTwoHanded data.Item
-		if items, ok := itemsByLoc[item.LocLeftArm]; ok {
-			for _, itm := range items {
-				if _, isTwoHanded := itm.FindStat(stat.TwoHandedMinDamage, 0); isTwoHanded {
-					bestTwoHanded = itm
-					break
+	// "Best Combo" logic for Two-Handed Weapons
+if target == item.LocationEquipped {
+	class := ctx.Data.PlayerUnit.Class
+
+	if items, ok := itemsByLoc[item.LocLeftArm]; ok && len(items) > 0 {
+		if _, found := items[0].FindStat(stat.TwoHandedMinDamage, 0); found {
+			if class != data.Barbarian || items[0].Desc().Type != "swor" {
+				var bestComboScore float64
+				for _, itm := range items {
+					if _, isTwoHanded := itm.FindStat(stat.TwoHandedMinDamage, 0); !isTwoHanded {
+						if score, exists := itemScores[itm.UnitID][item.LocLeftArm]; exists {
+							ctx.Logger.Debug(fmt.Sprintf("Best one-handed weapon score: %.1f", score))
+							bestComboScore = score
+							break
+						}
+					}
 				}
-			}
-		}
 
-		// Find the best one-handed weapon + shield combo
-		var bestOneHanded data.Item
-		if items, ok := itemsByLoc[item.LocLeftArm]; ok {
-			for _, itm := range items {
-				if _, isTwoHanded := itm.FindStat(stat.TwoHandedMinDamage, 0); !isTwoHanded {
-					bestOneHanded = itm
-					break
+				if rightArmItems, ok := itemsByLoc[item.LocRightArm]; ok && len(rightArmItems) > 0 {
+					if score, exists := itemScores[rightArmItems[0].UnitID][item.LocRightArm]; exists {
+						ctx.Logger.Debug(fmt.Sprintf("Best shield score: %.1f", score))
+						bestComboScore += score
+						ctx.Logger.Debug(fmt.Sprintf("Best one-hand + shield combo score: %.1f", bestComboScore))
+					}
 				}
-			}
-		}
 
-		var bestShield data.Item
-		if items, ok := itemsByLoc[item.LocRightArm]; ok {
-			bestShield = items[0]
-		}
-
-		// Calculate scores
-		twoHandedScore := itemScores[bestTwoHanded.UnitID][item.LocLeftArm]
-		comboScore := itemScores[bestOneHanded.UnitID][item.LocLeftArm] + itemScores[bestShield.UnitID][item.LocRightArm]
-
-		// Make a definitive choice between the two configurations
-		if bestTwoHanded.UnitID != 0 && twoHandedScore > comboScore {
-			// Two-handed weapon is better, so remove all other options
-			ctx.Logger.Debug(fmt.Sprintf("Choosing %s (2H) over combo.", bestTwoHanded.IdentifiedName))
-			itemsByLoc[item.LocLeftArm] = []data.Item{bestTwoHanded}
-			delete(itemsByLoc, item.LocRightArm)
-		} else if bestOneHanded.UnitID != 0 || bestShield.UnitID != 0 {
-			// Combo is better, so remove the two-handed weapon and select best combo items
-			ctx.Logger.Debug(fmt.Sprintf("Choosing combo over %s (2H).", bestTwoHanded.IdentifiedName))
-			if bestOneHanded.UnitID != 0 {
-				itemsByLoc[item.LocLeftArm] = []data.Item{bestOneHanded}
-			}
-			if bestShield.UnitID != 0 {
-				itemsByLoc[item.LocRightArm] = []data.Item{bestShield}
+				if twoHandedScore, exists := itemScores[items[0].UnitID][item.LocLeftArm]; exists {
+					if bestComboScore >= twoHandedScore {
+						ctx.Logger.Debug(fmt.Sprintf("Removing two-handed weapon: %s", items[0].IdentifiedName))
+						itemsByLoc[item.LocLeftArm] = itemsByLoc[item.LocLeftArm][1:]
+					} else {
+						ctx.Logger.Debug("Two-handed weapon is better, preventing shield equip.")
+						delete(itemsByLoc, item.LocRightArm)
+					}
+				}
 			}
 		}
 	}
+}
 
 	return itemsByLoc
 }
@@ -473,6 +470,7 @@ func equipBestItems(itemsByLoc map[item.LocationType][]data.Item, target item.Lo
 	return equippedSomething, nil
 }
 
+
 func getBodyLocationScreenCoords(bodyloc item.LocationType) (data.Position, error) {
 	ctx := context.Get()
 	if ctx.Data.LegacyGraphics {
@@ -527,6 +525,7 @@ func getBodyLocationScreenCoords(bodyloc item.LocationType) (data.Position, erro
 	}
 }
 
+
 func equipBestRings(itemsByLoc map[item.LocationType][]data.Item) (bool, error) {
 	ctx := context.Get()
 
@@ -551,7 +550,7 @@ func equipBestRings(itemsByLoc map[item.LocationType][]data.Item) (bool, error) 
 	})
 
 	if len(allRings) == 0 {
-		return false, nil
+		return false, nil 
 	}
 
 	bestRing := allRings[0]
@@ -575,7 +574,7 @@ func equipBestRings(itemsByLoc map[item.LocationType][]data.Item) (bool, error) 
 	for _, equipped := range equippedRings {
 		if equipped.UnitID != 0 && !idealIDs[equipped.UnitID] {
 			ringToReplace = equipped
-			break
+			break 
 		}
 	}
 
@@ -616,6 +615,8 @@ func equipBestRings(itemsByLoc map[item.LocationType][]data.Item) (bool, error) 
 
 	return false, nil
 }
+
+
 
 // equip handles the physical process of equipping an item. Returns ErrNotEnoughSpace if it fails.
 func equip(itm data.Item, bodyloc item.LocationType, target item.LocationType) error {
@@ -660,7 +661,7 @@ func equip(itm data.Item, bodyloc item.LocationType, target item.LocationType) e
 			ctx.HID.PressKeyBinding(ctx.Data.KeyBindings.MercenaryScreen)
 			utils.Sleep(EquipDelayMS)
 			ctx.HID.ClickWithModifier(game.LeftButton, ui.GetScreenCoordsForItem(itm).X, ui.GetScreenCoordsForItem(itm).Y, game.CtrlKey)
-		} else {
+		} else { 
 			currentlyEquipped := GetEquippedItem(ctx.Data.Inventory, bodyloc)
 			isRingSwap := itm.Desc().Type == "ring" && currentlyEquipped.UnitID != 0
 
@@ -673,9 +674,9 @@ func equip(itm data.Item, bodyloc item.LocationType, target item.LocationType) e
 
 				oldRingCoords, err := getBodyLocationScreenCoords(bodyloc)
 				if err != nil {
-					return err
+					return err 
 				}
-
+				
 				ctx.HID.ClickWithModifier(game.LeftButton, oldRingCoords.X, oldRingCoords.Y, game.ShiftKey)
 				utils.Sleep(1000)
 				*ctx.Data = ctx.GameReader.GetData()
@@ -685,7 +686,7 @@ func equip(itm data.Item, bodyloc item.LocationType, target item.LocationType) e
 					ctx.Logger.Warn("Failed to unequip old ring, it is still equipped. Aborting swap.")
 					return fmt.Errorf("failed to unequip old ring from %s", bodyloc)
 				}
-
+				
 				var newItemInInv data.Item
 				var foundInInv bool
 				for _, invItem := range ctx.Data.Inventory.ByLocation(item.LocationInventory) {
@@ -737,6 +738,7 @@ func equip(itm data.Item, bodyloc item.LocationType, target item.LocationType) e
 	}
 	return fmt.Errorf("verification failed after all attempts to equip %s", itm.IdentifiedName)
 }
+
 
 // findInventorySpace finds the top-left grid coordinates for a free spot in the inventory.
 func findInventorySpace(itm data.Item) (data.Position, bool) {
