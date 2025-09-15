@@ -183,7 +183,11 @@ func (s PaladinLeveling) SkillsToBind() (skill.ID, []skill.ID) {
 	if lvl.Value >= 6 {
 		skillBindings = append(skillBindings, skill.Vigor)
 	}
-
+	
+	if lvl.Value >= 24 {
+		skillBindings = append(skillBindings, skill.BlessedHammer)
+	}
+	
 	if lvl.Value >= 30 {
 		skillBindings = append(skillBindings, skill.HolyShield)
 	}
@@ -243,7 +247,6 @@ func (s PaladinLeveling) StatPoints() []context.StatAllocation {
 	return targets
 }
 
-// THIS FUNCTION HAS BEEN MODIFIED
 func (s PaladinLeveling) SkillPoints() []skill.ID {
 	lvl, _ := s.Data.PlayerUnit.FindStat(stat.Level, 0)
 
@@ -264,8 +267,8 @@ func (s PaladinLeveling) SkillPoints() []skill.ID {
 			skill.Might, skill.HolyBolt, skill.Prayer, skill.Defiance, skill.BlessedAim,
 			skill.Cleansing, skill.Concentration, skill.Vigor, skill.Smite, skill.Charge,
 			skill.BlessedHammer,
-			skill.BlessedHammer, skill.BlessedHammer, skill.BlessedHammer, skill.BlessedHammer, skill.BlessedHammer,
 			skill.HolyShield,
+			skill.BlessedHammer, skill.BlessedHammer, skill.BlessedHammer, skill.BlessedHammer, skill.BlessedHammer,
 			skill.BlessedHammer, skill.BlessedHammer, skill.BlessedHammer, skill.BlessedHammer, skill.BlessedHammer,
 			skill.BlessedHammer, skill.BlessedHammer, skill.BlessedHammer, skill.BlessedHammer, skill.BlessedHammer,
 			skill.BlessedHammer, skill.BlessedHammer, skill.BlessedHammer,
@@ -288,24 +291,23 @@ func (s PaladinLeveling) SkillPoints() []skill.ID {
 		}
 	}
 
+	// Calculate the total number of skill points the character should have
 	questSkillPoints := 0
-	// At level 24 reset, we only have Akara and Radament points (+2)
-	// We are assuming Izual quest is completed around level 27-28
-	if lvl.Value >= 28 {
-		questSkillPoints = 4 // Akara (+1), Radament (+1), Izual (+2)
-	} else if lvl.Value >= 17 { // Assuming Radament is done by this level
-		questSkillPoints = 2 // Akara (+1), Radament (+1)
-	} else if lvl.Value >= 2 { // Den of evil is the first quest
-		questSkillPoints = 1 // Akara (+1)
+	if s.Data.Quests[quest.Act1DenOfEvil].Completed() {
+		questSkillPoints++
+	}
+	if s.Data.Quests[quest.Act2RadamentsLair].Completed() {
+		questSkillPoints++
+	}
+	if s.Data.Quests[quest.Act4TheFallenAngel].Completed() {
+		questSkillPoints += 2
 	}
 
-	// Calculate total points to spend: (level - 1) for leveling + quest points
 	totalPoints := (int(lvl.Value) - 1) + questSkillPoints
 	if totalPoints < 0 {
 		totalPoints = 0
 	}
 
-	// Limit the skill sequence to the number of available points
 	var skillsToAllocateBasedOnLevel []skill.ID
 	if totalPoints < len(skillSequence) {
 		skillsToAllocateBasedOnLevel = skillSequence[:totalPoints]
@@ -313,14 +315,23 @@ func (s PaladinLeveling) SkillPoints() []skill.ID {
 		skillsToAllocateBasedOnLevel = skillSequence
 	}
 
-	skillsToAllocate := make([]skill.ID, 0)
 	targetLevels := make(map[skill.ID]int)
 	for _, sk := range skillsToAllocateBasedOnLevel {
 		targetLevels[sk]++
 	}
 
-	// We iterate over the original sequence to respect the order of skill allocation
+	skillsToAllocate := make([]skill.ID, 0)
+	
+	var uniqueSkills []skill.ID
+	seenSkills := make(map[skill.ID]bool)
 	for _, sk := range skillSequence {
+		if _, seen := seenSkills[sk]; !seen {
+			uniqueSkills = append(uniqueSkills, sk)
+			seenSkills[sk] = true
+		}
+	}
+
+	for _, sk := range uniqueSkills {
 		target := targetLevels[sk]
 		if target == 0 {
 			continue
@@ -331,8 +342,9 @@ func (s PaladinLeveling) SkillPoints() []skill.ID {
 			currentLevel = int(skillData.Level)
 		}
 
-		if currentLevel < target {
-			for i := 0; i < (target - currentLevel); i++ {
+		pointsToAdd := target - currentLevel
+		if pointsToAdd > 0 {
+			for i := 0; i < pointsToAdd; i++ {
 				skillsToAllocate = append(skillsToAllocate, sk)
 			}
 		}
@@ -635,3 +647,4 @@ func (s PaladinLeveling) KillBaal() error {
 	}
 
 }
+
