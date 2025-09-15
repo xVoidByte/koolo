@@ -109,6 +109,7 @@ func (pf *PathFinder) GetPathFrom(from, to data.Position) (Path, int, bool) {
 
 	// set barricade tower as non walkable in act 5
 	if a.Area == area.FrigidHighlands || a.Area == area.FrozenTundra || a.Area == area.ArreatPlateau {
+		towerCount := 0
 		for _, n := range pf.data.NPCs {
 			if n.ID != npc.BarricadeTower {
 				continue
@@ -118,10 +119,25 @@ func (pf *PathFinder) GetPathFrom(from, to data.Position) (Path, int, bool) {
 			}
 			npcPos := n.Positions[0]
 			relativePos := grid.RelativePosition(npcPos)
-			grid.CollisionGrid[relativePos.Y][relativePos.X] = game.CollisionTypeNonWalkable
+			towerCount++
+
+			// Set a 5x5 area around the barricade tower as non-walkable
+			blockedCells := 0
+			for dy := -2; dy <= 2; dy++ {
+				for dx := -2; dx <= 2; dx++ {
+					towerY := relativePos.Y + dy
+					towerX := relativePos.X + dx
+
+					// Bounds checking to prevent array index out of bounds
+					if towerY >= 0 && towerY < len(grid.CollisionGrid) &&
+						towerX >= 0 && towerX < len(grid.CollisionGrid[towerY]) {
+						grid.CollisionGrid[towerY][towerX] = game.CollisionTypeNonWalkable
+						blockedCells++
+					}
+				}
+			}
 		}
 	}
-
 	path, distance, found := astar.CalculatePath(grid, from, to)
 
 	if config.Koolo.Debug.RenderMap {
