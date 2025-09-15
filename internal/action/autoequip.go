@@ -51,6 +51,7 @@ var (
 		"HoradricStaff",
 		"AmuletOfTheViper",
 		"KhalimsFlail",
+		"KhalimsWill",
 	}
 )
 
@@ -899,3 +900,4 @@ func UnEquipMercenary() error {
 
 	return nil
 }
+
