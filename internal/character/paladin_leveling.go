@@ -15,6 +15,7 @@ import (
 	"github.com/hectorgimenez/koolo/internal/action/step"
 	"github.com/hectorgimenez/koolo/internal/context"
 	"github.com/hectorgimenez/koolo/internal/game"
+	"github.com/hectorgimenez/d2go/pkg/data/quest"
 )
 
 const (
@@ -647,4 +648,5 @@ func (s PaladinLeveling) KillBaal() error {
 	}
 
 }
+
 
