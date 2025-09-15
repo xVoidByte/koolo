@@ -77,7 +77,7 @@ const (
 	AnvilBtnYClassic = 300
 
 	MainSkillButtonX        = 596
-	MainSkillButtonXClassic = 300
+	MainSkillButtonXClassic = 320
 
 	MainSkillButtonY        = 693
 	MainSkillButtonYClassic = 690
