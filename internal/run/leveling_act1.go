@@ -263,7 +263,7 @@ func (a Leveling) goToAct2() error {
 	action.InteractNPC(npc.Warriv)
 	a.ctx.HID.KeySequence(win.VK_HOME, win.VK_DOWN, win.VK_RETURN)
 	utils.Sleep(1000)
-	a.HoldKey(win.VK_ESCAPE, 2000)
+	a.HoldKey(win.VK_SPACE, 2000)
 	utils.Sleep(1000)
 	return nil
 }
