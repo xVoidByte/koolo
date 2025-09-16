@@ -3,6 +3,7 @@ package action
 import (
 	"log/slog"
 
+	"github.com/hectorgimenez/d2go/pkg/data"
 	"github.com/hectorgimenez/d2go/pkg/data/item"
 	"github.com/hectorgimenez/d2go/pkg/data/npc"
 	"github.com/hectorgimenez/d2go/pkg/data/stat"
@@ -26,7 +27,7 @@ func VendorRefill(forceRefill bool, sellJunk bool, tempLock ...[][]int) (err err
 	vendorNPC := town.GetTownByArea(ctx.Data.PlayerUnit.Area).RefillNPC()
 	if vendorNPC == npc.Drognan {
 		_, needsBuy := town.ShouldBuyKeys()
-		if needsBuy {
+		if needsBuy && ctx.Data.PlayerUnit.Class != data.Assassin {
 			vendorNPC = npc.Lysander
 		}
 	}
