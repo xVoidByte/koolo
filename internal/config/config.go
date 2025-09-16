@@ -143,14 +143,13 @@ type CharacterCfg struct {
 		Runs                   []Run                 `yaml:"runs"`
 		CreateLobbyGames       bool                  `yaml:"createLobbyGames"`
 		PublicGameCounter      int                   `yaml:"-"`
-		// ADD THIS NEW FIELD
-		MaxFailedMenuAttempts int `yaml:"maxFailedMenuAttempts"` // New: Max consecutive attempts before declaring bot stuck in menu
-		Pindleskin            struct {
+		MaxFailedMenuAttempts  int                   `yaml:"maxFailedMenuAttempts"`
+		Pindleskin             struct {
 			SkipOnImmunities []stat.Resist `yaml:"skipOnImmunities"`
 		} `yaml:"pindleskin"`
 		Cows struct {
 			OpenChests bool `yaml:"openChests"`
-		}
+		} `yaml:"cows"`
 		Pit struct {
 			MoveThroughBlackMarsh bool `yaml:"moveThroughBlackMarsh"`
 			OpenChests            bool `yaml:"openChests"`
@@ -305,17 +304,14 @@ func (bm BeltColumns) Total(potionType data.PotionType) int {
 	return total
 }
 
-// Load reads the config.ini file and returns a Config struct filled with data from the ini file
 func Load() error {
 	Characters = make(map[string]*CharacterCfg)
 
-	// Get the absolute path of the current working directory
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("error getting current working directory: %w", err)
 	}
 
-	// Function to get absolute path
 	getAbsPath := func(relPath string) string {
 		return filepath.Join(cwd, relPath)
 	}
@@ -338,7 +334,6 @@ func Load() error {
 		return fmt.Errorf("error reading config directory %s: %w", configDir, err)
 	}
 
-	// Read character configs
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
@@ -346,49 +341,37 @@ func Load() error {
 
 		charCfg := CharacterCfg{}
 
-		// Load character config from the current working directory/config/{charName}/config.yaml
 		charConfigPath := getAbsPath(filepath.Join("config", entry.Name(), "config.yaml"))
 		r, err = os.Open(charConfigPath)
 		if err != nil {
 			return fmt.Errorf("error loading config.yaml: %w", err)
 		}
-		defer r.Close()
 
-		// Load character config
 		d := yaml.NewDecoder(r)
 		if err = d.Decode(&charCfg); err != nil {
 			_ = r.Close()
 			return fmt.Errorf("error reading %s character config: %w", charConfigPath, err)
 		}
-
 		_ = r.Close()
 
 		charCfg.ConfigFolderName = entry.Name()
 
-		// Set default value for MaxFailedMenuAttempts if not specified in the YAML
-		// This should be done AFTER decoding, so explicit values in YAML override it.
-		if charCfg.Game.MaxFailedMenuAttempts == 0 { // Assuming 0 means it wasn't set or explicitly set to 0.
-			charCfg.Game.MaxFailedMenuAttempts = 10 // Set your desired default here
+		if charCfg.Game.MaxFailedMenuAttempts == 0 {
+			charCfg.Game.MaxFailedMenuAttempts = 10
 		}
 
 		var pickitPath string
-
 		if Koolo.CentralizedPickitPath != "" && charCfg.UseCentralizedPickit {
-			// Validate centralized pickit path
 			if _, err := os.Stat(Koolo.CentralizedPickitPath); os.IsNotExist(err) {
 				utils.ShowDialog("Error loading pickit rules for "+entry.Name(), "The centralized pickit path does not exist: "+Koolo.CentralizedPickitPath+"\nPlease check your Koolo settings.\nFalling back to local pickit.")
-
-				// Set the pickit path to the current dir/config/{charName}/pickit
 				pickitPath = getAbsPath(filepath.Join("config", entry.Name(), "pickit")) + "\\"
 			} else {
 				pickitPath = Koolo.CentralizedPickitPath + "\\"
 			}
 		} else {
-			// Set the pickit path to the current dir/config/{charName}/pickit
 			pickitPath = getAbsPath(filepath.Join("config", entry.Name(), "pickit")) + "\\"
 		}
 
-		// Load the pickit rules from the directory
 		rules, err := nip.ReadDir(pickitPath)
 		if err != nil {
 			return fmt.Errorf("error reading pickit directory %s: %w", pickitPath, err)
@@ -396,24 +379,87 @@ func Load() error {
 
 		// Load the leveling pickit rules
 		if len(charCfg.Game.Runs) > 0 && charCfg.Game.Runs[0] == "leveling" {
-			levelingPickitPath := getAbsPath(filepath.Join("config", entry.Name(), "pickit_leveling")) + "\\"
-			levelingRules, err := nip.ReadDir(levelingPickitPath)
-			if err != nil {
-				return fmt.Errorf("error reading pickit_leveling directory %s: %w", levelingPickitPath, err)
+			levelingPickitPath := getAbsPath(filepath.Join("config", entry.Name(), "pickit_leveling"))
+			classPickitFile := filepath.Join(levelingPickitPath, charCfg.Character.Class+".nip")
+			questPickitFile := filepath.Join(levelingPickitPath, "quest.nip")
+
+			// Try to load the class-specific nip file first
+			if _, errStat := os.Stat(classPickitFile); errStat == nil {
+				classRules, err := readSinglePickitFile(classPickitFile)
+				if err != nil {
+					return err
+				}
+				rules = append(rules, classRules...)
+			} else {
+				// Fallback: if no class file, load all files EXCEPT quest.nip (to avoid duplicates)
+				if _, err := os.Stat(levelingPickitPath); !os.IsNotExist(err) {
+					allLevelingFiles, err := os.ReadDir(levelingPickitPath)
+					if err != nil {
+						return fmt.Errorf("could not read pickit_leveling dir: %w", err)
+					}
+
+					// Create a temporary directory for all non-class, non-quest files
+					tempDir := filepath.Join(levelingPickitPath, "temp_fallback")
+					if err := os.MkdirAll(tempDir, 0755); err == nil {
+						for _, file := range allLevelingFiles {
+							// Exclude quest.nip since it will be loaded separately
+							if file.Name() != "quest.nip" && strings.HasSuffix(file.Name(), ".nip") {
+								sourceData, _ := os.ReadFile(filepath.Join(levelingPickitPath, file.Name()))
+								os.WriteFile(filepath.Join(tempDir, file.Name()), sourceData, 0644)
+							}
+						}
+						
+						fallbackRules, _ := nip.ReadDir(tempDir + "\\")
+						rules = append(rules, fallbackRules...)
+						os.RemoveAll(tempDir)
+					}
+				}
 			}
-			rules = append(rules, levelingRules...)
+
+			// Separately, try to load quest.nip and append its rules
+			if _, errStat := os.Stat(questPickitFile); errStat == nil {
+				questRules, err := readSinglePickitFile(questPickitFile)
+				if err != nil {
+					return err
+				}
+				rules = append(rules, questRules...)
+			}
 		}
 
 		charCfg.Runtime.Rules = rules
 		Characters[entry.Name()] = &charCfg
 	}
 
-	// Validate configs
 	for _, charCfg := range Characters {
 		charCfg.Validate()
 	}
 
 	return nil
+}
+
+// Helper function to read a single NIP file using the temp directory workaround
+func readSinglePickitFile(filePath string) (nip.Rules, error) {
+	tempDir := filepath.Join(filepath.Dir(filePath), "temp_single_read")
+	if err := os.MkdirAll(tempDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create temp pickit directory: %w", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	destFile := filepath.Join(tempDir, filepath.Base(filePath))
+	sourceData, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read source pickit file %s: %w", filePath, err)
+	}
+	if err := os.WriteFile(destFile, sourceData, 0644); err != nil {
+		return nil, fmt.Errorf("failed to write to temp pickit file: %w", err)
+	}
+
+	rules, err := nip.ReadDir(tempDir + "\\")
+	if err != nil {
+		return nil, fmt.Errorf("error reading from temp pickit directory %s: %w", tempDir, err)
+	}
+
+	return rules, nil
 }
 
 func CreateFromTemplate(name string) error {
@@ -434,11 +480,9 @@ func CreateFromTemplate(name string) error {
 }
 
 func ValidateAndSaveConfig(config KooloCfg) error {
-	// Trim executable from the path, just in case
 	config.D2LoDPath = strings.ReplaceAll(strings.ToLower(config.D2LoDPath), "game.exe", "")
 	config.D2RPath = strings.ReplaceAll(strings.ToLower(config.D2RPath), "d2r.exe", "")
 
-	// Validate paths
 	if _, err := os.Stat(config.D2LoDPath + "/d2data.mpq"); os.IsNotExist(err) {
 		return errors.New("D2LoDPath is not valid")
 	}
