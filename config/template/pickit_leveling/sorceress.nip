@@ -3,26 +3,23 @@
 
 [type] == gold # [gold] >= 2000
 
-[name] == elrune # # [maxquantity] == 4
-[name] == eldrune # # [maxquantity] == 4
-[name] == tirrune # # [maxquantity] == 4
-[name] == nefrune # # [maxquantity] == 4
-[name] == ethrune # # [maxquantity] == 4
-[name] == ithrune # # [maxquantity] == 4
-[name] == talrune # # [maxquantity] == 4
-[name] == ralrune # # [maxquantity] == 4
-[name] == ortrune # # [maxquantity] == 4
-[name] == thulrune # # [maxquantity] == 4
-[name] == amnrune # # [maxquantity] == 5
-[name] == solrune # # [maxquantity] == 5
-[name] == shaelrune # # [maxquantity] == 5
-[name] == dolrune # # [maxquantity] == 5
-[name] == helrune # # [maxquantity] == 5 
-[name] == iorune # # [maxquantity] == 5
-[name] == lumrune # # [maxquantity] == 5
-[name] == korune # # [maxquantity] == 5
-[name] == falrune # # [maxquantity] == 5 
-[name] == lemrune # # [maxquantity] == 5
+
+[name] == tirrune # # [maxquantity] == 2
+[name] == nefrune # # [maxquantity] == 2
+[name] == ethrune # # [maxquantity] == 1
+[name] == ithrune # # [maxquantity] == 2
+[name] == talrune # # [maxquantity] == 3
+[name] == ralrune # # [maxquantity] == 2
+[name] == ortrune # # [maxquantity] == 2
+[name] == thulrune # # [maxquantity] == 2
+[name] == amnrune # # [maxquantity] == 2
+[name] == solrune # # [maxquantity] == 2
+[name] == shaelrune # # [maxquantity] == 2
+[name] == dolrune # # [maxquantity] == 2
+[name] == helrune # # [maxquantity] == 2 
+[name] == iorune # # [maxquantity] == 2
+[name] == lumrune # # [maxquantity] == 3
+[name] == korune # # [maxquantity] == 3
 [name] == pulrune # # [maxquantity] == 5
 [name] == umrune 	
 [name] == malrune 	
@@ -52,27 +49,7 @@
 //[name] == flawedsapphire # # [maxquantity] == 5
 //[name] == flawedskull # # [maxquantity] == 5
 //[name] == flawedtopaz # # [maxquantity] == 5
-[name] == amethyst # # [maxquantity] == 2
-[name] == diamond # # [maxquantity] == 2
-[name] == emerald # # [maxquantity] == 2
-[name] == ruby # # [maxquantity] == 2
-[name] == skull # # [maxquantity] == 2
-[name] == sapphire # # [maxquantity] == 2
-[name] == topaz # # [maxquantity] == 2
-[name] == flawlessamethyst # # [maxquantity] == 2
-[name] == flawlessdiamond # # [maxquantity] == 2
-[name] == flawlessemerald # # [maxquantity] == 2
-[name] == flawlessruby # # [maxquantity] == 2
-[name] == flawlesssapphire # # [maxquantity] == 2
-[name] == flawlessskull # # [maxquantity] == 2
-[name] == flawlesstopaz # # [maxquantity] == 2
-[name] == perfectamethyst # # [maxquantity] == 5
-[name] == perfectdiamond # # [maxquantity] == 5
-[name] == perfectemerald # # [maxquantity] == 5
-[name] == perfectruby # # [maxquantity] == 5
-[name] == perfectsapphire # # [maxquantity] == 5
-[name] == perfectskull # # [maxquantity] == 5
-[name] == perfecttopaz # # [maxquantity] == 5
+[name] == flawlessamethyst # # [maxquantity] == 3
 
 // potions
 [name] == minorhealingpotion
@@ -88,29 +65,19 @@
 [name] == rejuvenationpotion
 [name] == fullrejuvenationpotion
 
-// Bases
-[name] == crystalsword && [flag] != ethereal # [sockets] == 4 # # [maxquantity] == 1 // Spirit 
-[name] == crystalsword && [flag] != ethereal # # [maxquantity] == 1 // Spirit
-[type] == shield # [sockets] == 4 # # [maxquantity] == 1 // Spirit
-[type] == shield # [sockets] == 3  # # [maxquantity] == 1 // Ancient's Pledge
-[type] == polearm # [sockets] == 4  # # [maxquantity] == 1 // Insight
-[type] == armor # [sockets] == 3 # # [maxquantity] == 1 // Treachery
-[type] == armor # [sockets] == 2 # # [maxquantity] == 1 // Stealth
-[type] == helm # [sockets] == 2 # # [maxquantity] == 1 // Lore
-[type] == scimitar # [sockets] == 2 # # [maxquantity] == 1 // steel
-[name] == shortstaff # [sockets] == 2 # # [maxquantity] == 1 //Leaf
+//Bases
+([Name] == CrystalSword || [Name] == BroadSword) && [Quality] <= Superior && [Flag] != Ethereal # [Sockets] == 4 # [MaxQuantity] == 1 // spirit
+[type] == polearm && [quality] <= superior # [sockets] == 4 # [MaxQuantity] == 1 // any insight polearm
+[type] == polearm && [quality] <= superior && [flag] == ethereal && [Class] >= elite # [sockets] == 4 # [MaxQuantity] == 1
+[type] == polearm && [quality] <= superior && [flag] == ethereal && [Class] >= exceptional # [sockets] == 4 # [MaxQuantity] == 1
+[Type] == Armor && [Quality] <= Superior && [Flag] != Ethereal # [Sockets] == 2 # [MaxQuantity] == 1 
+[Type] == Armor && [Quality] <= Superior && [Flag] != Ethereal # [Sockets] == 3 # [MaxQuantity] == 1 
+[type] == helm && [Quality] <= Superior && [Flag] != Ethereal # [Sockets] == 2 # [MaxQuantity] == 1 
+[name] == monarch && [quality] <= superior # [sockets] == 4 # [maxquantity] == 1
+[Type] == Shield && [quality] <= superior # [sockets] == 3 # [maxquantity] == 1
 
-// Paladin Shields
-[name] == rondache && [flag] != ethereal # [sockets] == 4 # # [maxquantity] == 1
-[name] == rondache && [flag] != ethereal # [sockets] == 3 # # [maxquantity] == 1
-[name] == akarantarge && [flag] != ethereal # [sockets] == 4 # # [maxquantity] == 1
-[name] == akarantarge && [flag] != ethereal # [sockets] == 3 # # [maxquantity] == 1
-[name] == aerinshield && [flag] != ethereal # [sockets] == 4 # # [maxquantity] == 1
-[name] == aerinshield && [flag] != ethereal # [sockets] == 3 # # [maxquantity] == 1
-[name] == akaranrondache && [flag] != ethereal # [sockets] == 4 # # [maxquantity] == 1
-[name] == akaranrondache && [flag] != ethereal # [sockets] == 3 # # [maxquantity] == 1
-[name] == heraldicshield && [flag] != ethereal # [sockets] == 4 # # [maxquantity] == 1
-[name] == heraldicshield && [flag] != ethereal # [sockets] == 3 # # [maxquantity] == 1
+[name] == deathmask && [quality] == set # [fireresist] == 15 # [maxquantity] == 1
+
 
 
 //[type] == gloves && [quality] >= rare
@@ -122,13 +89,6 @@
 //[type] == polearm && [quality] >= rare
 
 
-[Name] == FuryVisor && [Quality] == unique // Wolfhowl
-[Name] == SkySpirit && [Quality] == unique // Ravenlore
-[Name] == Corona && [Quality] == unique // Crown Of Ages
-[Name] == Diadem && [Quality] == unique // Griffon's Eye
-[Name] == WarHat && [Quality] == unique // Peasant Crown
-[Name] == Tiara && [Quality] == unique // Kira's Guardian
- 
 [Name] == GrimHelm && [Quality] == unique // Vampire Gaze
 [Name] == Shako && [Quality] == unique // Harlequin Crest
 [Name] == BoneVisage && [Quality] == unique // Giant Skull
@@ -214,11 +174,6 @@
 // >>>>>> Whites:
  
 [Name] == Monarch && [Quality] <= Superior # [sockets] == 4
-[Name] == TrollNest && [Quality] <= Superior # [sockets] == 3
-[Name] == SacredTarge && [Quality] <= Superior # [sockets] == 4
-[Name] == VortexShield && [Quality] <= Superior # [sockets] == 4
-[Name] == ZakarumShield && [Quality] <= Superior # [sockets] == 4
-[Name] == SacredRondache && [Quality] <= Superior # [sockets] == 4
  
 // >>>>>> Magic:
  
@@ -1356,4 +1311,5 @@
 [Name] == Smallcharm && [Quality] == Magic # [maxdamage] >= 3 && [tohit] >= 19 && [fhr] >= 5
 [Name] == Smallcharm && [Quality] == Magic # [maxdamage] >= 3 && [tohit] >= 15 && [maxhp] >= 15
 [Name] == Smallcharm && [Quality] == Magic # [maxdamage] >= 3 && [tohit] >= 19 && [frw] >= 3
+
 [Name] == Smallcharm && [Quality] == Magic # [poisonmaxdam] >= 251
