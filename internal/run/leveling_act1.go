@@ -170,7 +170,7 @@ func (a Leveling) setupLevelOneConfig() {
 	a.ctx.CharacterCfg.Game.Leveling.EnsureKeyBinding = true
 	a.ctx.CharacterCfg.Game.Leveling.AutoEquip = true
 	a.ctx.CharacterCfg.Game.Leveling.EnableRunewordMaker = true
-	a.ctx.CharacterCfg.Game.Leveling.EnabledRunewordRecipes = []string{"Ancients' Pledge", "Lore", "Insight", "Spirit", "Smoke", "Treachery", "Heart of the Oak", "Call to Arms"}
+	a.ctx.CharacterCfg.Game.Leveling.EnabledRunewordRecipes = []string{"Stealth", "Ancients' Pledge", "Lore", "Insight", "Spirit", "Smoke", "Treachery", "Heart of the Oak", "Call to Arms"}
 	a.ctx.CharacterCfg.Character.UseTeleport = true
 	a.ctx.CharacterCfg.Character.UseMerc = false
 	a.ctx.CharacterCfg.Game.UseCainIdentify = true
@@ -398,3 +398,4 @@ func (a Leveling) shouldFarmCountessForRunes() bool {
 	a.ctx.Logger.Info("All required runes are present. Skipping Countess farm.")
 	return false
 }
+
