@@ -44,17 +44,6 @@ func (a Leveling) act1() error {
 
 	// --- Quest and Farming Logic ---
 
-	// Countess farming for runes
-	if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Normal && a.ctx.Data.Quests[quest.Act1TheSearchForCain].Completed() && lvl.Value >= 8 && lvl.Value <= 12 {
-		a.ctx.Logger.Info("Farming Countess for runes.")
-		return NewCountess().Run()
-	}
-
-	if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && lvl.Value < 48 && a.ctx.Data.Quests[quest.Act1DenOfEvil].Completed() && a.shouldFarmCountessForRunes() {
-		a.ctx.Logger.Info("Farming Countess for required runes.")
-		return NewCountess().Run()
-	}
-
 	// Farming for low gold
 	if a.ctx.Data.PlayerUnit.TotalPlayerGold() < 50000 {
 		if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare {
@@ -119,15 +108,20 @@ func (a Leveling) act1() error {
 		return NewQuests().rescueCainQuest()
 	}
 
-	// Tristram only until lvl 6, then Trist + Act1 Progression (good exp, less town chores)
-	if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Normal && lvl.Value < 8 {
+	// Tristram only until lvl 6, then Trist + Countess
+	if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Normal && lvl.Value < 12 {
 
-		a.ctx.CharacterCfg.Character.ClearPathDist = 20
+		if a.ctx.CharacterCfg.Character.Class == "sorceress_leveling" {
+			a.ctx.CharacterCfg.Character.ClearPathDist = 5
+		} else {
+			a.ctx.CharacterCfg.Character.ClearPathDist = 20
+		}
+
 		if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
 			a.ctx.Logger.Error(fmt.Sprintf("Failed to save character configuration: %s", err.Error()))
 		}
 
-		if lvl.Value < 8 {
+		if lvl.Value < 6 {
 			// Run Tristram and end the function
 			return NewTristram().Run()
 		} else {
@@ -136,6 +130,17 @@ func (a Leveling) act1() error {
 
 		}
 
+	}
+
+	// Countess farming for runes
+	if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Normal && a.ctx.Data.Quests[quest.Act1TheSearchForCain].Completed() && lvl.Value >= 6 && lvl.Value < 12 {
+		a.ctx.Logger.Info("Farming Countess for runes.")
+		return NewCountess().Run()
+	}
+
+	if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && lvl.Value < 48 && a.ctx.Data.Quests[quest.Act1DenOfEvil].Completed() && a.shouldFarmCountessForRunes() {
+		a.ctx.Logger.Info("Farming Countess for required runes.")
+		return NewCountess().Run()
 	}
 
 	// Andariel or Act 2 transition
