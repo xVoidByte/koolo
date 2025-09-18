@@ -30,7 +30,6 @@ func MakeRunewords() error {
 
 		continueProcessing := true
 		for continueProcessing {
-
 			if baseItem, hasBase := hasBaseForRunewordRecipe(baseItems, recipe); hasBase {
 				existingTier, hasExisting := currentRunewordBaseTier(ctx, recipe, baseItem.Type().Name)
 				// Prevent creating runeword multiple times if we don't care about damage / def
@@ -53,7 +52,6 @@ func MakeRunewords() error {
 				} else {
 					continueProcessing = false
 				}
-				baseItems = removeUsedItems(baseItems, []data.Item{baseItem})
 			} else {
 				continueProcessing = false
 			}
