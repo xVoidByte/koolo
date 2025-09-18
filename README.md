@@ -1,4 +1,6 @@
-The sorceress leveling feature has been completed.
+We are completing the leveling feature and work on other improvements.
+
+Currently working classes: Sorceress, Paladin, Assassin
 
 As written more detailed below you need to install:
 
@@ -7,7 +9,7 @@ As written more detailed below you need to install:
 
 Use better_build.bat to build the application.
 
-- Use "Sorc (Leveling as Fire)" or "Paladin Leveling" those are the only two classes that work for now.
+- Use "Sorc (Leveling as Fire)", "Paladin (Leveling)" or "Assassin (Leveling)".
 - Choose "leveling" as enabled run under "Run Settings"
 - Start your char with lvl 1 as the autoconfig currently works at lvl 1 only. Alternatively you can check act1.go for detailed manual config. This handling will be enhanced later.
 
