@@ -20,6 +20,7 @@ import (
 	"github.com/hectorgimenez/d2go/pkg/data/npc"
 	"github.com/hectorgimenez/d2go/pkg/data/skill"
 	"github.com/hectorgimenez/d2go/pkg/data/stat"
+	"github.com/hectorgimenez/d2go/pkg/memory"
 )
 
 var uiStatButtonPosition = map[stat.ID]data.Position{
@@ -614,32 +615,64 @@ func HireMerc() error {
 
 	_, isLevelingChar := ctx.Char.(context.LevelingCharacter)
 	if isLevelingChar && ctx.CharacterCfg.Character.UseMerc {
-		// Check if we already have an Act 2 mercenary
-		if isMercenaryPresent(npc.Guard) {
-			ctx.Logger.Debug("An Act 2 merc is already present, no need to hire a new one.")
+		// Check if we already have a suitable mercenary
+		if isMercenaryPresent(npc.Guard) && ctx.Data.MercHPPercent() > 0 {
+			ctx.Logger.Debug("An Act 2 merc is already present and alive, no need to hire a new one.")
 			return nil
 		}
 
-		// Hire the merc if we don't have one, we have enough gold, and we are in act 2.
-		if ctx.CharacterCfg.Game.Difficulty == difficulty.Normal && (ctx.Data.MercHPPercent() <= 0 || !isMercenaryPresent(npc.Guard)) && ctx.Data.PlayerUnit.TotalPlayerGold() > 5000 && ctx.Data.PlayerUnit.Area == area.LutGholein {
-			ctx.Logger.Info("Hiring merc...")
+		// Only hire in Normal difficulty
+		if ctx.CharacterCfg.Game.Difficulty == difficulty.Normal && ctx.Data.PlayerUnit.TotalPlayerGold() > 5000 && ctx.Data.PlayerUnit.Area == area.LutGholein {
+			ctx.Logger.Info("Attempting to hire 'Prayer' mercenary...")
 
-			// TODO: Hire Holy Freeze merc if available, if not, hire Defiance merc.
-			err := InteractNPC(town.GetTownByArea(ctx.Data.PlayerUnit.Area).MercContractorNPC())
-			if err != nil {
+			isLegacy := ctx.Data.LegacyGraphics
+			if !isLegacy {
+				ctx.Logger.Info("Switching to legacy mode to hire merc")
+				ctx.HID.PressKey(ctx.Data.KeyBindings.LegacyToggle.Key1[0])
+				utils.Sleep(500)
+			}
+
+			if err := InteractNPC(town.GetTownByArea(ctx.Data.PlayerUnit.Area).MercContractorNPC()); err != nil {
 				return err
 			}
+
 			ctx.HID.KeySequence(win.VK_HOME, win.VK_DOWN, win.VK_RETURN)
 			utils.Sleep(2000)
-			if ctx.Data.LegacyGraphics {
-				ctx.HID.KeySequence(win.VK_RETURN)
-			} else {
-				ctx.HID.Click(game.LeftButton, ui.FirstMercFromContractorListX, ui.FirstMercFromContractorListY)
-				utils.Sleep(50)
-				ctx.HID.Click(game.LeftButton, ui.FirstMercFromContractorListX, ui.FirstMercFromContractorListY)
+
+			mercList := ctx.GameReader.GetMercList()
+
+			var mercToHire *memory.MercOption
+			for i := range mercList {
+				if mercList[i].Skill.ID == skill.Prayer { // Targeting the Prayer skill ID
+					mercToHire = &mercList[i]
+					break
+				}
 			}
-			utils.Sleep(2000)
-			ctx.HID.KeySequence(win.VK_HOME, win.VK_RETURN)
+
+			if mercToHire != nil {
+				ctx.Logger.Info(fmt.Sprintf("Hiring merc: %s with skill %s", mercToHire.Name, mercToHire.Skill.Name))
+				keySequence := []byte{win.VK_HOME}
+				for i := 0; i < mercToHire.Index; i++ {
+					keySequence = append(keySequence, win.VK_DOWN)
+				}
+				keySequence = append(keySequence, win.VK_RETURN, win.VK_UP, win.VK_RETURN)
+				ctx.HID.KeySequence(keySequence...)
+				utils.Sleep(1000)
+			} else {
+				ctx.Logger.Info("No merc with Prayer found.")
+				utils.Sleep(1000)
+			}
+
+			step.CloseAllMenus()
+
+			if !isLegacy && !ctx.CharacterCfg.ClassicMode {
+				ctx.Logger.Info("Switching back to non-legacy mode")
+				ctx.HID.PressKey(ctx.Data.KeyBindings.LegacyToggle.Key1[0])
+				utils.Sleep(500)
+			}
+
+			ctx.Logger.Info("Mercenary hiring routine complete.")
+			AutoEquip()
 		}
 	}
 
