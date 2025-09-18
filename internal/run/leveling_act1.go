@@ -175,7 +175,13 @@ func (a Leveling) setupLevelOneConfig() {
 	a.ctx.CharacterCfg.Game.Leveling.EnsureKeyBinding = true
 	a.ctx.CharacterCfg.Game.Leveling.AutoEquip = true
 	a.ctx.CharacterCfg.Game.Leveling.EnableRunewordMaker = true
-	a.ctx.CharacterCfg.Game.Leveling.EnabledRunewordRecipes = []string{"Stealth", "Ancients' Pledge", "Lore", "Insight", "Spirit", "Smoke", "Treachery", "Heart of the Oak", "Call to Arms"}
+
+	if a.ctx.CharacterCfg.Character.Class == "paladin" {
+		a.ctx.CharacterCfg.Game.Leveling.EnabledRunewordRecipes = []string{"Steel", "Stealth", "Ancients' Pledge", "Lore", "Insight", "Spirit", "Smoke", "Treachery", "Heart of the Oak", "Call to Arms"}
+	} else {
+		a.ctx.CharacterCfg.Game.Leveling.EnabledRunewordRecipes = []string{"Stealth", "Ancients' Pledge", "Lore", "Insight", "Spirit", "Smoke", "Treachery", "Heart of the Oak", "Call to Arms"}
+	}
+
 	a.ctx.CharacterCfg.Character.UseTeleport = true
 	a.ctx.CharacterCfg.Character.UseMerc = false
 	a.ctx.CharacterCfg.Game.UseCainIdentify = true
