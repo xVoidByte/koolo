@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/hectorgimenez/d2go/pkg/data/difficulty"
 	"github.com/hectorgimenez/d2go/pkg/data"
 	"github.com/hectorgimenez/d2go/pkg/data/area"
+	"github.com/hectorgimenez/d2go/pkg/data/difficulty"
 	"github.com/hectorgimenez/d2go/pkg/data/object"
 	"github.com/hectorgimenez/koolo/internal/action"
 	"github.com/hectorgimenez/koolo/internal/config"
@@ -14,7 +14,6 @@ import (
 	"github.com/hectorgimenez/koolo/internal/game"
 	"github.com/hectorgimenez/koolo/internal/utils"
 )
-
 
 var TristramlStartingPosition = data.Position{
 	X: 25173,
@@ -34,7 +33,7 @@ var TristramClearPos2 = data.Position{
 var TristramClearPos3 = data.Position{
 	X: 25163,
 	Y: 5192,
-}	
+}
 var TristramClearPos4 = data.Position{
 	X: 25139,
 	Y: 5186,
@@ -49,9 +48,8 @@ var TristramClearPos6 = data.Position{
 }
 var TristramClearPos7 = data.Position{
 	X: 25123,
-	Y: 5140,	
+	Y: 5140,
 }
-
 
 type Tristram struct {
 	ctx *context.Status
@@ -123,31 +121,30 @@ func (t Tristram) Run() error {
 
 			return !obj.Selectable
 		})
-	} else {
-
-						t.ctx.CharacterCfg.Character.ClearPathDist = 25
-	if err := config.SaveSupervisorConfig(t.ctx.CharacterCfg.ConfigFolderName, t.ctx.CharacterCfg); err != nil {
-		t.ctx.Logger.Error("Failed to save character configuration: %s", err.Error())}
-		
-		t.ctx.Logger.Info("Clearing Tristram")
-		action.MoveToCoords(TristramlStartingPosition)
-		action.ClearAreaAroundPlayer(25, data.MonsterAnyFilter())
-		action.MoveToCoords(TristramClearPos1)
-		action.ClearAreaAroundPlayer(25, data.MonsterAnyFilter())
-		action.MoveToCoords(TristramClearPos2)
-		action.ClearAreaAroundPlayer(35, data.MonsterAnyFilter())
-		action.MoveToCoords(TristramClearPos3)
-		action.ClearAreaAroundPlayer(40, data.MonsterAnyFilter())
-		action.MoveToCoords(TristramClearPos4)
-		action.ClearAreaAroundPlayer(40, data.MonsterAnyFilter())
-		action.MoveToCoords(TristramClearPos5)
-		action.ClearAreaAroundPlayer(40, data.MonsterAnyFilter())
-		action.MoveToCoords(TristramClearPos6)
-		action.ClearAreaAroundPlayer(40, data.MonsterAnyFilter())
-		action.MoveToCoords(TristramClearPos7)
-		action.ClearAreaAroundPlayer(40, data.MonsterAnyFilter())
-	
 	}
+
+	t.ctx.CharacterCfg.Character.ClearPathDist = 25
+	if err := config.SaveSupervisorConfig(t.ctx.CharacterCfg.ConfigFolderName, t.ctx.CharacterCfg); err != nil {
+		t.ctx.Logger.Error("Failed to save character configuration: %s", err.Error())
+	}
+
+	t.ctx.Logger.Info("Clearing Tristram")
+	action.MoveToCoords(TristramlStartingPosition)
+	action.ClearAreaAroundPlayer(25, data.MonsterAnyFilter())
+	action.MoveToCoords(TristramClearPos1)
+	action.ClearAreaAroundPlayer(25, data.MonsterAnyFilter())
+	action.MoveToCoords(TristramClearPos2)
+	action.ClearAreaAroundPlayer(35, data.MonsterAnyFilter())
+	action.MoveToCoords(TristramClearPos3)
+	action.ClearAreaAroundPlayer(40, data.MonsterAnyFilter())
+	action.MoveToCoords(TristramClearPos4)
+	action.ClearAreaAroundPlayer(40, data.MonsterAnyFilter())
+	action.MoveToCoords(TristramClearPos5)
+	action.ClearAreaAroundPlayer(40, data.MonsterAnyFilter())
+	action.MoveToCoords(TristramClearPos6)
+	action.ClearAreaAroundPlayer(40, data.MonsterAnyFilter())
+	action.MoveToCoords(TristramClearPos7)
+	action.ClearAreaAroundPlayer(40, data.MonsterAnyFilter())
 
 	return nil
 }
