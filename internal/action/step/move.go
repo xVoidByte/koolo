@@ -7,8 +7,8 @@ import (
 	"math"
 	"time"
 
-	"github.com/hectorgimenez/d2go/pkg/data/area"
 	"github.com/hectorgimenez/d2go/pkg/data"
+	"github.com/hectorgimenez/d2go/pkg/data/area"
 	"github.com/hectorgimenez/d2go/pkg/data/object"
 	"github.com/hectorgimenez/d2go/pkg/data/skill"
 	"github.com/hectorgimenez/d2go/pkg/data/stat"
@@ -120,7 +120,6 @@ func MoveTo(dest data.Position, options ...MoveOption) error {
 
 	idleStartTime := time.Time{}
 	stuckCheckStartTime := time.Time{}
-	openedDoors := make(map[object.Name]data.Position)
 
 	var walkDuration time.Duration
 	if !ctx.Data.AreaData.Area.IsTown() {
@@ -217,12 +216,6 @@ func MoveTo(dest data.Position, options ...MoveOption) error {
 				x, y := ui.GameCoordsToScreenCords(obj.Position.X, obj.Position.Y)
 				ctx.HID.Click(game.LeftButton, x, y)
 				time.Sleep(time.Millisecond * 50)
-				continue
-			}
-
-			//    Then, handle obstacles specifically in the path
-			obstacleHandled := handleObstaclesInPath(currentDest, openedDoors)
-			if obstacleHandled {
 				continue
 			}
 
@@ -361,42 +354,6 @@ func MoveTo(dest data.Position, options ...MoveOption) error {
 	}
 }
 
-func isObjectInPath(dest data.Position, player data.Position, object data.Position, tolerance float64) bool {
-	ctx := context.Get()
-	minX := math.Min(float64(player.X), float64(dest.X)) - tolerance
-	maxX := math.Max(float64(player.X), float64(dest.X)) + tolerance
-	minY := math.Min(float64(player.Y), float64(dest.Y)) - tolerance
-	maxY := math.Max(float64(player.Y), float64(dest.Y)) + tolerance
-
-	if object.X >= int(maxX) || object.X <= int(minX) || object.Y <= int(minY) || object.Y >= int(maxY) {
-		return false
-	}
-
-	if player.X == dest.X {
-		if math.Abs(float64(player.X)-float64(object.X)) >= tolerance {
-			ctx.Logger.Debug(fmt.Sprintf("Object is vertical, check failed with value %.2f ", math.Abs(float64(player.X)-float64(object.X))))
-			return false
-		}
-		return true
-	}
-
-	if player.Y == dest.Y {
-		if math.Abs(float64(player.Y)-float64(object.Y)) >= tolerance {
-			ctx.Logger.Debug(fmt.Sprintf("Object is horizontal, check failed with value %.2f ", math.Abs(float64(player.Y)-float64(object.Y))))
-			return false
-		}
-		return true
-	}
-
-	distFromLine := math.Abs(((float64(dest.X)-float64(player.X))*(float64(player.Y)-float64(object.Y)))-((float64(player.X)-float64(object.X))*(float64(dest.Y)-float64(player.Y)))) / math.Sqrt((float64(dest.X)-float64(player.X))*(float64(dest.X)-float64(player.X))+(float64(dest.Y)-float64(player.Y))*(float64(dest.Y)-float64(player.Y)))
-	ctx.Logger.Debug(fmt.Sprintf("Object is distance: %.2f from our path", distFromLine))
-	if distFromLine >= tolerance {
-		return false
-	} else {
-		return true
-	}
-}
-
 func handleImmediateObstacles() (*data.Object, bool) {
 	ctx := context.Get()
 	breakableObjects := []object.Name{
@@ -441,56 +398,6 @@ func handleImmediateObstacles() (*data.Object, bool) {
 	}
 
 	return nil, false
-}
-
-func handleObstaclesInPath(dest data.Position, openedDoors map[object.Name]data.Position) bool {
-	ctx := context.Get()
-
-	for _, o := range ctx.Data.Objects {
-		if o.IsDoor() && o.Selectable &&
-			ctx.PathFinder.DistanceFromMe(o.Position) < 8 &&
-			openedDoors[o.Name] != o.Position {
-
-			doorPos := o.Position
-			ourPos := ctx.Data.PlayerUnit.Position
-
-			threshhold := 8.0
-
-			if isObjectInPath(dest, ourPos, doorPos, threshhold) {
-				ctx.Logger.Debug("Door detected in path, opening it...")
-				openedDoors[o.Name] = o.Position
-
-				err := InteractObject(o, func() bool {
-					obj, found := ctx.Data.Objects.FindByID(o.ID)
-					return found && !obj.Selectable
-				})
-
-				if err != nil {
-					ctx.Logger.Debug("Failed to open door", slog.String("error", err.Error()))
-				} else {
-					return true
-				}
-			}
-		}
-	}
-
-	for _, o := range ctx.Data.Objects {
-		if o.Name == object.Barrel && ctx.PathFinder.DistanceFromMe(o.Position) < 3 {
-			objPos := o.Position
-			ourPos := ctx.Data.PlayerUnit.Position
-
-			dotProduct := (objPos.X-ourPos.X)*(dest.X-ourPos.X) + (objPos.Y-ourPos.Y)*(dest.Y-ourPos.Y)
-			lengthSquared := (dest.X-ourPos.X)*(dest.X-ourPos.X) + (dest.Y-ourPos.Y)*(dest.Y-ourPos.Y)
-
-			if lengthSquared > 0 && dotProduct > 0 && dotProduct < lengthSquared {
-				ctx.Logger.Debug("Destructible object in path, destroying it...")
-				x, y := ui.GameCoordsToScreenCords(o.Position.X, o.Position.Y)
-				ctx.HID.Click(game.LeftButton, x, y)
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func findClosestShrine() *data.Object {
