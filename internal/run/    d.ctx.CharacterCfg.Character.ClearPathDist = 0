@@ -164,8 +164,10 @@ func (d *Diablo) Run() error {
 	}
 
 	if d.ctx.CharacterCfg.Game.Diablo.KillDiablo {
-		action.Buff()
 
+		d.ctx.CharacterCfg.Character.ClearPathDist = 0
+		action.Buff()
+	
 		action.MoveToCoords(diabloSpawnPosition)
 
 		// Check if we should disable item pickup for Diablo
