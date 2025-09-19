@@ -368,28 +368,23 @@ func (s AssassinLeveling) killBoss(bossNPC npc.ID, timeout time.Duration) error 
 				break 
 			}
 
-			if lvl.Value < 48 {
-				if time.Since(lastTrapVolley) > time.Second*5 {
-					s.Logger.Info("Placing Wake of Fire traps...")
-					for i := 0; i < 5; i++ {
-						if b, f := s.Data.Monsters.FindOne(bossNPC, data.MonsterTypeUnique); !f || b.Stats[stat.Life] <= 0 {
-							break
-						}
-						step.SecondaryAttack(skill.WakeOfFire, boss.UnitID, 1, step.Distance(10, 15))
-					}
-					lastTrapVolley = time.Now()
-				} else {
-					step.SecondaryAttack(skill.FireBlast, boss.UnitID, 1, step.Distance(10, 15))
-				}
-			} else {
-				if time.Since(lastTrapVolley) > time.Second*5 {
-					s.Logger.Info("Placing Lightning Sentry traps...")
-				step.SecondaryAttack(skill.LightningSentry, boss.UnitID, 5, step.Distance(10, 15))
-					lastTrapVolley = time.Now()
-				} else {
-					step.SecondaryAttack(skill.ShockWeb, boss.UnitID, 1, step.Distance(10, 15))
-				}
-			}
+	 if lvl.Value < 48 {
+        if time.Since(lastTrapVolley) > time.Second*5 {
+            s.Logger.Info("Placing Wake of Fire traps...")
+            step.SecondaryAttack(skill.WakeOfFire, boss.UnitID, 5, step.Distance(10, 15))
+            lastTrapVolley = time.Now()
+        } else {
+            step.SecondaryAttack(skill.FireBlast, boss.UnitID, 1, step.Distance(10, 15))
+        }
+    } else {
+        if time.Since(lastTrapVolley) > time.Second*5 {
+            s.Logger.Info("Placing Lightning Sentry traps...")
+            step.SecondaryAttack(skill.LightningSentry, boss.UnitID, 5, step.Distance(10, 15))
+            lastTrapVolley = time.Now()
+        } else {
+            step.SecondaryAttack(skill.ShockWeb, boss.UnitID, 1, step.Distance(10, 15))
+        }
+    }
 		}
 
 		// After the inner loop, check if boss is dead and return if so
@@ -525,3 +520,4 @@ func (s AssassinLeveling) KillBaal() error {
 	return s.killBoss(npc.BaalCrab, time.Second*240)
 
 }
+
