@@ -89,7 +89,7 @@ func (a Leveling) act5() error {
 		}
 	}
 
-	if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && lvl.Value < 60 {
+	if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && lvl.Value < 60 || a.ctx.CharacterCfg.Game.Difficulty == difficulty.Normal && lvl.Value < 33 {
 
 		diabloRun := NewDiablo()
 		err := diabloRun.Run()
@@ -112,7 +112,6 @@ func (a Leveling) act5() error {
 	wp, _ := a.ctx.Data.Objects.FindOne(object.ExpansionWaypoint)
 	action.MoveToCoords(wp.Position)
 
-
 	anyaQuest := a.ctx.Data.Quests[quest.Act5PrisonOfIce]
 	_, anyaInTown := a.ctx.Data.Monsters.FindOne(npc.Drehya, data.MonsterTypeNone)
 
@@ -122,7 +121,7 @@ func (a Leveling) act5() error {
 		if !anyaInTown {
 			if !anyaQuest.Completed() {
 				a.ctx.Logger.Info("Step 1: Quest has not been started. Going to Anya in the Frozen River.")
-				NewQuests().rescueAnyaQuest() 
+				NewQuests().rescueAnyaQuest()
 				action.MoveToCoords(data.Position{X: 5107, Y: 5119})
 				action.InteractNPC(npc.Drehya)
 				utils.Sleep(500)
@@ -144,7 +143,7 @@ func (a Leveling) act5() error {
 					a.ctx.Logger.Info("Step 2: Talking to Malah for the potion.")
 					action.InteractNPC(npc.Malah)
 					utils.Sleep(500)
-					return nil 
+					return nil
 				}
 
 				a.ctx.Logger.Info("Step 3: Returning to Anya with the potion.")
@@ -160,7 +159,6 @@ func (a Leveling) act5() error {
 				NewQuests().rescueAnyaQuest()
 				return nil
 			}
-
 
 			if a.ctx.Data.PlayerUnit.Area == area.FrozenRiver && hasPotion {
 				a.ctx.Logger.Info("Step 3: Thawing Anya.")
@@ -184,22 +182,22 @@ func (a Leveling) act5() error {
 				}
 				return nil
 			}
-		 } else { // Anya is in town, but the quest is not complete. Force the final steps.
+		} else { // Anya is in town, but the quest is not complete. Force the final steps.
 			a.ctx.Logger.Info("Step 4: Anya is in town. Talking to Malah for reward.")
 			// Move close to Malah before interacting
 			if malah, found := a.ctx.Data.Monsters.FindOne(npc.Malah, data.MonsterTypeNone); found {
 				action.MoveToCoords(malah.Position)
 			}
 			action.InteractNPC(npc.Malah)
-			
+
 			// Adding a longer delay to ensure the game state has time to update
 			utils.Sleep(2500)
 
-	a.ctx.Logger.Info("Step 5: Talking to Anya to complete the quest.")
+			a.ctx.Logger.Info("Step 5: Talking to Anya to complete the quest.")
 			// Using static coordinates for Anya as dynamic detection is failing.
 			anyaPosition := data.Position{X: 5130, Y: 5120}
 			action.MoveToCoords(anyaPosition)
-			
+
 			action.InteractNPC(npc.Drehya)
 			utils.Sleep(1000)
 
@@ -257,3 +255,5 @@ func (a Leveling) CrystallinePassage() error {
 	return nil
 
 }
+
+
