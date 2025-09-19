@@ -193,7 +193,8 @@ func (s AssassinLeveling) SkillsToBind() (skill.ID, []skill.ID) {
 		skillBindings = []skill.ID{
 			skill.LightningSentry,
 			skill.DeathSentry,
-			skill.FireBlast, 
+			skill.FireBlast,
+			skill.ShockWeb,
 		}
 	}
 
@@ -255,20 +256,24 @@ func (s AssassinLeveling) SkillPoints() []skill.ID {
 	} else {
 		// TRAPSIN BUILD (LVL 48+)
 		skillSequence = []skill.ID{
-			skill.PsychicHammer, skill.ClawMastery, skill.CloakOfShadows, skill.MindBlast,
-			skill.BurstOfSpeed, skill.FireBlast, skill.ShockWeb, skill.ChargedBoltSentry, skill.LightningSentry, skill.Fade,
-			skill.Fade, skill.Fade, skill.Fade, skill.Fade, skill.Fade,
+			skill.ClawMastery,
+			skill.BurstOfSpeed, skill.FireBlast, skill.ShockWeb, skill.ChargedBoltSentry, skill.LightningSentry, skill.DeathSentry,
+			skill.Fade, skill.Fade, skill.Fade, skill.Fade, skill.Fade, skill.Fade,
 			skill.LightningSentry, skill.LightningSentry, skill.LightningSentry, skill.LightningSentry, skill.LightningSentry,
 			skill.LightningSentry, skill.LightningSentry, skill.LightningSentry, skill.LightningSentry, skill.LightningSentry,
 			skill.LightningSentry, skill.LightningSentry, skill.LightningSentry, skill.LightningSentry, skill.LightningSentry,
-			skill.DeathSentry, skill.DeathSentry, skill.DeathSentry, skill.DeathSentry, skill.DeathSentry,
-			skill.DeathSentry, skill.DeathSentry, skill.DeathSentry, skill.DeathSentry,
-			skill.ChargedBoltSentry, skill.ChargedBoltSentry, skill.ChargedBoltSentry, skill.ChargedBoltSentry, skill.ChargedBoltSentry,
+			skill.ShockWeb, skill.ShockWeb, skill.ShockWeb, skill.ShockWeb, skill.ShockWeb,
+			skill.ShockWeb, skill.ShockWeb, skill.ShockWeb, skill.ShockWeb, skill.ShockWeb,
+			skill.ShockWeb, skill.ShockWeb, skill.ShockWeb, skill.ShockWeb,
 			skill.ChargedBoltSentry, skill.ChargedBoltSentry, skill.ChargedBoltSentry, skill.ChargedBoltSentry, skill.ChargedBoltSentry,
 			skill.LightningSentry, skill.LightningSentry, skill.LightningSentry, skill.LightningSentry, // Max LS
-			skill.ChargedBoltSentry, skill.ChargedBoltSentry, skill.ChargedBoltSentry, skill.ChargedBoltSentry, skill.ChargedBoltSentry, skill.ChargedBoltSentry, skill.ChargedBoltSentry, skill.ChargedBoltSentry, skill.ChargedBoltSentry, // Max CBS
-			skill.ShockWeb, skill.ShockWeb, skill.ShockWeb, skill.ShockWeb, skill.ShockWeb, skill.ShockWeb, skill.ShockWeb, skill.ShockWeb, skill.ShockWeb, skill.ShockWeb, skill.ShockWeb, skill.ShockWeb, skill.ShockWeb, skill.ShockWeb, skill.ShockWeb, skill.ShockWeb, skill.ShockWeb, skill.ShockWeb, skill.ShockWeb, skill.ShockWeb, // Max Shock Web
-			skill.Fade, skill.Fade, skill.Fade, skill.Fade, skill.Fade, skill.Fade, skill.Fade, skill.Fade, skill.Fade, skill.Fade, skill.Fade, skill.Fade, skill.Fade, skill.Fade, // Max Fade
+			skill.ShockWeb, skill.ShockWeb, skill.ShockWeb, skill.ShockWeb, // Max Shock Web
+			skill.ChargedBoltSentry, skill.ChargedBoltSentry, skill.ChargedBoltSentry, skill.ChargedBoltSentry, skill.ChargedBoltSentry, skill.ChargedBoltSentry, skill.ChargedBoltSentry, skill.ChargedBoltSentry, skill.ChargedBoltSentry, 
+			skill.ChargedBoltSentry, skill.ChargedBoltSentry, skill.ChargedBoltSentry, skill.ChargedBoltSentry, skill.ChargedBoltSentry, // Max CBS
+			skill.DeathSentry, skill.DeathSentry, skill.DeathSentry, skill.DeathSentry, skill.DeathSentry, skill.DeathSentry, skill.DeathSentry, 
+			skill.Fade, skill.Fade, skill.Fade,
+			skill.DeathSentry, skill.DeathSentry, skill.DeathSentry, skill.DeathSentry, skill.DeathSentry, skill.DeathSentry, skill.DeathSentry, skill.DeathSentry, skill.DeathSentry, skill.DeathSentry, skill.DeathSentry, skill.DeathSentry, //MAX DS  
+			skill.Fade, skill.Fade, skill.Fade, skill.Fade, skill.Fade, skill.Fade, skill.Fade, skill.Fade, skill.Fade, skill.Fade, skill.Fade, // Max Fade
 			skill.FireBlast, skill.FireBlast, skill.FireBlast, skill.FireBlast, skill.FireBlast, skill.FireBlast, skill.FireBlast, skill.FireBlast, skill.FireBlast, skill.FireBlast, skill.FireBlast, skill.FireBlast, skill.FireBlast, skill.FireBlast, skill.FireBlast, skill.FireBlast, skill.FireBlast, skill.FireBlast, skill.FireBlast, skill.FireBlast, // Max Fire Blast
 		}
 	}
@@ -341,36 +346,71 @@ func (s AssassinLeveling) SkillPoints() []skill.ID {
 func (s AssassinLeveling) killBoss(bossNPC npc.ID, timeout time.Duration) error {
 	s.Logger.Info(fmt.Sprintf("Starting kill sequence for %s...", bossNPC))
 	startTime := time.Now()
+	lastTrapVolley := time.Time{} 
 
 	for time.Since(startTime) < timeout {
 		boss, found := s.Data.Monsters.FindOne(bossNPC, data.MonsterTypeUnique)
+		if !found {
+			time.Sleep(time.Second)
+			continue
+		}
 
-		if found && boss.Stats[stat.Life] > 0 {
-			s.Logger.Info(fmt.Sprintf("%s has been found! Engaging...", bossNPC))
+		s.Logger.Info(fmt.Sprintf("%s has been found! Engaging...", bossNPC))
+		lvl, _ := s.Data.PlayerUnit.FindStat(stat.Level, 0)
 
-			for {
-				boss, stillAlive := s.Data.Monsters.FindOne(bossNPC, data.MonsterTypeUnique)
-				if !stillAlive || boss.Stats[stat.Life] <= 0 {
-					s.Logger.Info(fmt.Sprintf("%s has been defeated.", bossNPC))
-					if bossNPC == npc.BaalCrab {
-						s.Logger.Info("Waiting...")
-						time.Sleep(time.Second * 1)
+		for boss.Stats[stat.Life] > 0 {
+			if time.Since(startTime) > timeout {
+				return fmt.Errorf("%s timeout", bossNPC)
+			}
+
+			boss, found = s.Data.Monsters.FindOne(bossNPC, data.MonsterTypeUnique)
+			if !found || boss.Stats[stat.Life] <= 0 {
+				break 
+			}
+
+			if lvl.Value < 48 {
+				if time.Since(lastTrapVolley) > time.Second*5 {
+					s.Logger.Info("Placing Wake of Fire traps...")
+					for i := 0; i < 5; i++ {
+						if b, f := s.Data.Monsters.FindOne(bossNPC, data.MonsterTypeUnique); !f || b.Stats[stat.Life] <= 0 {
+							break
+						}
+						step.SecondaryAttack(skill.WakeOfFire, boss.UnitID, 1, step.Distance(10, 15))
 					}
-					return nil
+					lastTrapVolley = time.Now()
+				} else {
+					step.SecondaryAttack(skill.FireBlast, boss.UnitID, 1, step.Distance(10, 15))
 				}
-				s.KillMonsterSequence(func(d game.Data) (data.UnitID, bool) {
-					return boss.UnitID, true
-				}, nil)
+			} else {
+				if time.Since(lastTrapVolley) > time.Second*5 {
+					s.Logger.Info("Placing Lightning Sentry traps...")
+					for i := 0; i < 5; i++ {
+						if b, f := s.Data.Monsters.FindOne(bossNPC, data.MonsterTypeUnique); !f || b.Stats[stat.Life] <= 0 {
+							break
+						}
+						step.SecondaryAttack(skill.LightningSentry, boss.UnitID, 1, step.Distance(10, 15))
+					}
+					lastTrapVolley = time.Now()
+				} else {
+					step.SecondaryAttack(skill.ShockWeb, boss.UnitID, 1, step.Distance(10, 15))
+				}
 			}
 		}
 
-		time.Sleep(time.Second) 
+		// After the inner loop, check if boss is dead and return if so
+		if boss.Stats[stat.Life] <= 0 {
+			s.Logger.Info(fmt.Sprintf("%s has been defeated.", bossNPC))
+			if bossNPC == npc.BaalCrab {
+				s.Logger.Info("Waiting...")
+				time.Sleep(time.Second * 1)
+			}
+			return nil
+		}
 	}
 
 	s.Logger.Error(fmt.Sprintf("Timed out waiting for %s.", bossNPC))
 	return fmt.Errorf("%s timeout", bossNPC)
 }
-
 func (s AssassinLeveling) killMonsterByName(id npc.ID, monsterType data.MonsterType, skipOnImmunities []stat.Resist) error {
 	s.Logger.Info(fmt.Sprintf("Starting persistent kill sequence for %s...", id))
 	
@@ -407,7 +447,7 @@ func (s AssassinLeveling) KillCountess() error {
 }
 
 func (s AssassinLeveling) KillAndariel() error {
-	return s.killMonsterByName(npc.Andariel, data.MonsterTypeUnique, nil)
+	return s.killBoss(npc.Andariel, time.Second*220)
 }
 
 func (s AssassinLeveling) KillSummoner() error {
@@ -415,7 +455,7 @@ func (s AssassinLeveling) KillSummoner() error {
 }
 
 func (s AssassinLeveling) KillDuriel() error {
-	return s.killMonsterByName(npc.Duriel, data.MonsterTypeUnique, nil)
+	return s.killBoss(npc.Duriel, time.Second*220)
 }
 
 func (s AssassinLeveling) KillCouncil() error {
@@ -443,7 +483,7 @@ func (s AssassinLeveling) KillCouncil() error {
 }
 
 func (s AssassinLeveling) KillMephisto() error {
-	return s.killMonsterByName(npc.Mephisto, data.MonsterTypeUnique, nil)
+	return s.killBoss(npc.Mephisto, time.Second*220)
 }
 
 func (s AssassinLeveling) KillIzual() error {
