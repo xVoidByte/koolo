@@ -138,7 +138,7 @@ func (a Leveling) act1() error {
 		return NewCountess().Run()
 	}
 
-	if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && lvl.Value < 48 && a.ctx.Data.Quests[quest.Act1DenOfEvil].Completed() && a.shouldFarmCountessForRunes() {
+	if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && lvl.Value < 50 && a.ctx.Data.Quests[quest.Act1DenOfEvil].Completed() && a.shouldFarmCountessForRunes() {
 		a.ctx.Logger.Info("Farming Countess for required runes.")
 		return NewCountess().Run()
 	}
@@ -393,8 +393,11 @@ func (a Leveling) shouldFarmCountessForRunes() bool {
 		"OrtRune":  2,
 		"AmnRune":  2,
 		"TirRune":  1,
-		"SolRune":  1,
-		"RalRune":  1,
+		"SolRune":  2,
+		"RalRune":  2,
+		"LumRune":  2,
+		"NefRune":  2,
+		"ShaelRune":  2,
 	}
 
 	ownedRunes := make(map[string]int)
@@ -420,3 +423,4 @@ func (a Leveling) shouldFarmCountessForRunes() bool {
 	a.ctx.Logger.Info("All required runes are present. Skipping Countess farm.")
 	return false
 }
+
