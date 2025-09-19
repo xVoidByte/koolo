@@ -89,7 +89,7 @@ func (a Leveling) act5() error {
 		}
 	}
 
-	if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && lvl.Value < 60 || a.ctx.CharacterCfg.Game.Difficulty == difficulty.Normal && lvl.Value < 35 {
+	if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && lvl.Value < 60 || a.ctx.CharacterCfg.Game.Difficulty == difficulty.Normal && lvl.Value < 33 {
 
 		diabloRun := NewDiablo()
 		err := diabloRun.Run()
@@ -255,4 +255,5 @@ func (a Leveling) CrystallinePassage() error {
 	return nil
 
 }
+
 
