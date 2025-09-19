@@ -8,6 +8,7 @@ As written more detailed below you need to install:
 - Garble
 
 Use better_build.bat to build the application.
+Make sure the game is in English
 
 - Use "Sorc (Leveling as Fire)", "Paladin (Leveling)" or "Assassin (Leveling)".
 - Choose "leveling" as enabled run under "Run Settings"
