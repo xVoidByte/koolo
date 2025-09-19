@@ -7,8 +7,10 @@ As written more detailed below you need to install:
 - Go (1.24, not 1.25!)
 - Garble
 
+
+Make sure the game is in English.
+
 Use better_build.bat to build the application.
-Make sure the game is in English
 
 - Use "Sorc (Leveling as Fire)", "Paladin (Leveling)" or "Assassin (Leveling)".
 - Choose "leveling" as enabled run under "Run Settings"
