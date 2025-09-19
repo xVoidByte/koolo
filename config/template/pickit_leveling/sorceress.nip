@@ -1,23 +1,21 @@
 // IGNORED by default, this directory is ONLY evaluated DURING the character leveling process.
 // Rules here are included ADDITIONALLY to the main pickit rules
 
-[name] == tirrune # # [maxquantity] == 2
-[name] == nefrune # # [maxquantity] == 2
+[name] == talrune # # [maxquantity] == 4
 [name] == ethrune # # [maxquantity] == 1
-[name] == ithrune # # [maxquantity] == 2
-[name] == talrune # # [maxquantity] == 3
-[name] == ralrune # # [maxquantity] == 2
-[name] == ortrune # # [maxquantity] == 2
-[name] == thulrune # # [maxquantity] == 2
-[name] == amnrune # # [maxquantity] == 2
+[name] == ralrune # # [maxquantity] == 3
+[name] == ortrune # # [maxquantity] == 3
 [name] == solrune # # [maxquantity] == 2
-[name] == shaelrune # # [maxquantity] == 2
-[name] == dolrune # # [maxquantity] == 2
-[name] == helrune # # [maxquantity] == 2
-[name] == iorune # # [maxquantity] == 2
-[name] == lumrune # # [maxquantity] == 3
-[name] == korune # # [maxquantity] == 3
-[name] == pulrune # # [maxquantity] == 5
+[name] == tirrune # # [maxquantity] == 1
+[name] == thulrune # # [maxquantity] == 3
+[name] == amnrune # # [maxquantity] == 2
+[name] == shaelrune # # [maxquantity] == 1
+[name] == nefrune # # [maxquantity] == 1
+[name] == lumrune # # [maxquantity] == 1
+[name] == korune # # [maxquantity] == 1
+[name] == helrune # # [maxquantity] == 5
+[name] == lemrune
+[name] == pulrune
 [name] == umrune
 [name] == malrune
 [name] == istrune
