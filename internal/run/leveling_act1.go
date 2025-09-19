@@ -397,7 +397,7 @@ func (a Leveling) shouldFarmCountessForRunes() bool {
 		"RalRune":  2,
 		"LumRune":  2,
 		"NefRune":  2,
-		"ShaelRune":  2,
+		"ShaelRune":  1,
 	}
 
 	ownedRunes := make(map[string]int)
@@ -423,4 +423,5 @@ func (a Leveling) shouldFarmCountessForRunes() bool {
 	a.ctx.Logger.Info("All required runes are present. Skipping Countess farm.")
 	return false
 }
+
 
