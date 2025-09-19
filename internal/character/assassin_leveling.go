@@ -384,12 +384,7 @@ func (s AssassinLeveling) killBoss(bossNPC npc.ID, timeout time.Duration) error 
 			} else {
 				if time.Since(lastTrapVolley) > time.Second*5 {
 					s.Logger.Info("Placing Lightning Sentry traps...")
-					for i := 0; i < 5; i++ {
-						if b, f := s.Data.Monsters.FindOne(bossNPC, data.MonsterTypeUnique); !f || b.Stats[stat.Life] <= 0 {
-							break
-						}
-						step.SecondaryAttack(skill.LightningSentry, boss.UnitID, 1, step.Distance(10, 15))
-					}
+				step.SecondaryAttack(skill.LightningSentry, boss.UnitID, 5, step.Distance(10, 15))
 					lastTrapVolley = time.Now()
 				} else {
 					step.SecondaryAttack(skill.ShockWeb, boss.UnitID, 1, step.Distance(10, 15))
@@ -487,7 +482,7 @@ func (s AssassinLeveling) KillMephisto() error {
 }
 
 func (s AssassinLeveling) KillIzual() error {
-	return s.killMonsterByName(npc.Izual, data.MonsterTypeUnique, nil)
+	return s.killBoss(npc.Izual, time.Second*220)
 }
 
 func (s AssassinLeveling) KillDiablo() error {
@@ -528,4 +523,5 @@ func (s AssassinLeveling) KillNihlathak() error {
 
 func (s AssassinLeveling) KillBaal() error {
 	return s.killBoss(npc.BaalCrab, time.Second*240)
+
 }
