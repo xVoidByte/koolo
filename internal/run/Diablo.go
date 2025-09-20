@@ -163,12 +163,14 @@ func (d *Diablo) Run() error {
 
 	}
 
-	if d.ctx.CharacterCfg.Game.Diablo.KillDiablo {
-		
-		defer func() {
+		originalClearPathDistCfg := d.ctx.CharacterCfg.Character.ClearPathDist
 		d.ctx.CharacterCfg.Character.ClearPathDist = 0
-		  }()
-		  
+
+		defer func() {
+			d.ctx.CharacterCfg.Character.ClearPathDist  = originalClearPathDistCfg
+		
+		}()  
+  
 		action.Buff()
 
 		action.MoveToCoords(diabloSpawnPosition)
