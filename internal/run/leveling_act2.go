@@ -215,8 +215,11 @@ func (a Leveling) act2() error {
 		}
 	}
 
-	if !a.ctx.Data.Quests[quest.Act2TheHoradricStaff].Completed() {
+	if a.ctx.Data.Quests[quest.Act2TheHoradricStaff].HasStatus(quest.StatusInProgress4) {
+		action.InteractNPC(npc.Drognan)
+	}
 
+	if !a.ctx.Data.Quests[quest.Act2TheHoradricStaff].Completed() {
 		_, horadricStaffFound := a.ctx.Data.Inventory.Find("HoradricStaff", item.LocationInventory, item.LocationStash, item.LocationEquipped)
 
 		// Find Staff of Kings
@@ -234,7 +237,7 @@ func (a Leveling) act2() error {
 			a.ctx.Logger.Info("Amulet of the Viper found, skipping quest")
 		} else {
 			a.ctx.Logger.Info("Amulet of the Viper not found, starting quest")
-			a.findAmulet()
+			return a.findAmulet()
 		}
 	}
 
