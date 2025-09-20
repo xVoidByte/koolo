@@ -57,7 +57,7 @@ func (a Leveling) act5() error {
 		currentDifficulty := a.ctx.CharacterCfg.Game.Difficulty
 		switch currentDifficulty {
 		case difficulty.Normal:
-			if lvl.Value >= 45 {
+			if lvl.Value >= 41 {
 				a.ctx.CharacterCfg.Game.Difficulty = difficulty.Nightmare
 				difficultyChanged = true
 			}
@@ -255,5 +255,6 @@ func (a Leveling) CrystallinePassage() error {
 	return nil
 
 }
+
 
 
