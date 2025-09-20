@@ -395,7 +395,6 @@ func (a Leveling) shouldFarmCountessForRunes() bool {
 		"TirRune":   1,
 		"SolRune":   3,
 		"RalRune":   2,
-		"LumRune":   2,
 		"NefRune":   2,
 		"ShaelRune": 2,
 		"IoRune":    1,
@@ -424,3 +423,4 @@ func (a Leveling) shouldFarmCountessForRunes() bool {
 	a.ctx.Logger.Info("All required runes are present. Skipping Countess farm.")
 	return false
 }
+
