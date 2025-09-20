@@ -170,18 +170,18 @@ func (a Leveling) act1() error {
 
 // setupLevelOneConfig centralizes the configuration logic for a new character.
 func (a Leveling) setupLevelOneConfig() {
+	enabledRunewordRecipes := []string{"Stealth", "Ancients' Pledge", "Lore", "Insight", "Spirit", "Smoke", "Treachery", "Heart of the Oak", "Call to Arms", "Bulwark"}
+
+	if a.ctx.CharacterCfg.Character.Class == "paladin" {
+		enabledRunewordRecipes = append(enabledRunewordRecipes, "Steel")
+	}
+
 	a.ctx.CharacterCfg.Game.Difficulty = difficulty.Normal
 	a.ctx.CharacterCfg.Game.Leveling.EnsurePointsAllocation = true
 	a.ctx.CharacterCfg.Game.Leveling.EnsureKeyBinding = true
 	a.ctx.CharacterCfg.Game.Leveling.AutoEquip = true
 	a.ctx.CharacterCfg.Game.Leveling.EnableRunewordMaker = true
-
-	if a.ctx.CharacterCfg.Character.Class == "paladin" {
-		a.ctx.CharacterCfg.Game.Leveling.EnabledRunewordRecipes = []string{"Steel", "Stealth", "Ancients' Pledge", "Lore", "Insight", "Spirit", "Smoke", "Treachery", "Heart of the Oak", "Call to Arms"}
-	} else {
-		a.ctx.CharacterCfg.Game.Leveling.EnabledRunewordRecipes = []string{"Stealth", "Ancients' Pledge", "Lore", "Insight", "Spirit", "Smoke", "Treachery", "Heart of the Oak", "Call to Arms"}
-	}
-
+	a.ctx.CharacterCfg.Game.Leveling.EnabledRunewordRecipes = enabledRunewordRecipes
 	a.ctx.CharacterCfg.Character.UseTeleport = true
 	a.ctx.CharacterCfg.Character.UseMerc = false
 	a.ctx.CharacterCfg.Game.UseCainIdentify = true
@@ -388,16 +388,17 @@ func atDistance(start, end data.Position, distance int) data.Position {
 // shouldFarmCountessForRunes checks if the character should farm Countess for runes in Nightmare difficulty.
 func (a Leveling) shouldFarmCountessForRunes() bool {
 	requiredRunes := map[string]int{
-		"TalRune":  3,
-		"ThulRune": 2,
-		"OrtRune":  2,
-		"AmnRune":  2,
-		"TirRune":  1,
-		"SolRune":  2,
-		"RalRune":  2,
-		"LumRune":  2,
-		"NefRune":  2,
-		"ShaelRune":  1,
+		"TalRune":   3,
+		"ThulRune":  2,
+		"OrtRune":   2,
+		"AmnRune":   2,
+		"TirRune":   1,
+		"SolRune":   3,
+		"RalRune":   2,
+		"LumRune":   2,
+		"NefRune":   2,
+		"ShaelRune": 2,
+		"IoRune":    1,
 	}
 
 	ownedRunes := make(map[string]int)
@@ -423,5 +424,3 @@ func (a Leveling) shouldFarmCountessForRunes() bool {
 	a.ctx.Logger.Info("All required runes are present. Skipping Countess farm.")
 	return false
 }
-
-
