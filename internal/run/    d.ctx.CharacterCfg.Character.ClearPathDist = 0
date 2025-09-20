@@ -16,8 +16,7 @@ import (
 var diabloSpawnPosition = data.Position{X: 7792, Y: 5294}
 var chaosNavToPosition = data.Position{X: 7732, Y: 5292} //into path towards vizier
 
-type Diablo struct {
-	ctx *context.Status
+type Diablo struct {	ctx *context.Status
 }
 
 func NewDiablo() *Diablo {
@@ -164,10 +163,13 @@ func (d *Diablo) Run() error {
 	}
 
 	if d.ctx.CharacterCfg.Game.Diablo.KillDiablo {
-
+		
+		defer func() {
 		d.ctx.CharacterCfg.Character.ClearPathDist = 0
+		  }()
+		  
 		action.Buff()
-	
+
 		action.MoveToCoords(diabloSpawnPosition)
 
 		// Check if we should disable item pickup for Diablo
