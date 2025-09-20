@@ -327,7 +327,7 @@ func MoveTo(toFunc func() (data.Position, bool)) error {
 		// Always check for enemies within clearPathDist before ANY movement attempt for non-teleporters.
 		monstersInRange := false
 		for _, m := range ctx.Data.Monsters.Enemies(data.MonsterAnyFilter()) {
-			if m.Stats[stat.Life] > 0 && ctx.PathFinder.DistanceFromMe(m.Position) <= clearPathDist {
+			if m.Stats[stat.Life] > 0 && ctx.PathFinder.DistanceFromMe(m.Position) <= clearPathDist && ctx.PathFinder.LineOfSight(ctx.Data.PlayerUnit.Position, m.Position) {
 				monstersInRange = true
 				break
 			}

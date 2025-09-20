@@ -9,13 +9,10 @@ import (
 	"github.com/hectorgimenez/koolo/internal/action/step"
 	"github.com/hectorgimenez/koolo/internal/config"
 	"github.com/hectorgimenez/koolo/internal/context"
-	"github.com/hectorgimenez/d2go/pkg/data/difficulty"
 	"github.com/hectorgimenez/koolo/internal/game"
 	"github.com/hectorgimenez/koolo/internal/ui"
 	"github.com/hectorgimenez/koolo/internal/utils"
-	
 )
-
 
 var andarielClearPos1 = data.Position{
 	X: 22575,
@@ -31,7 +28,6 @@ var andarielClearPos3 = data.Position{
 	X: 22553,
 	Y: 9636,
 }
-
 
 var andarielClearPos4 = data.Position{
 	X: 22541,
@@ -73,7 +69,6 @@ var andarielClearPos11 = data.Position{
 	Y: 9589,
 }
 
-
 var andarielAttackPos1 = data.Position{
 	X: 22547,
 	Y: 9582,
@@ -107,22 +102,14 @@ func (a Andariel) Run() error {
 		return err
 	}
 
-						a.ctx.CharacterCfg.Character.ClearPathDist = 20
-	if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
-		a.ctx.Logger.Error("Failed to save character configuration: %s", err.Error())}
-
-
-
 	err = action.MoveToArea(area.CatacombsLevel3)
 	action.MoveToArea(area.CatacombsLevel4)
 	if err != nil {
 		return err
 	}
 
+	if a.ctx.CharacterCfg.Game.Andariel.ClearRoom {
 
-
-if a.ctx.CharacterCfg.Game.Andariel.ClearRoom {
-	
 		// Clearing inside room
 		a.ctx.Logger.Info("Clearing inside room")
 		action.MoveToCoords(andarielClearPos1)
@@ -147,100 +134,89 @@ if a.ctx.CharacterCfg.Game.Andariel.ClearRoom {
 		action.ClearAreaAroundPlayer(15, data.MonsterAnyFilter())
 		action.MoveToCoords(andarielClearPos11)
 		action.ClearAreaAroundPlayer(15, data.MonsterAnyFilter())
-		
 
-			if a.ctx.CharacterCfg.Game.Andariel.UseAntidoes {
-		reHidePortraits := false
-		action.ReturnTown()
+		if a.ctx.CharacterCfg.Game.Andariel.UseAntidoes {
+			reHidePortraits := false
+			action.ReturnTown()
 
-		potsToBuy := 4
-		if a.ctx.Data.MercHPPercent() > 0 {
-			potsToBuy = 8
-			if a.ctx.CharacterCfg.HidePortraits && !a.ctx.Data.OpenMenus.PortraitsShown {
-				a.ctx.CharacterCfg.HidePortraits = false
-				reHidePortraits = true
-				a.ctx.HID.PressKey(a.ctx.Data.KeyBindings.ShowPortraits.Key1[0])
-			}
-		}
-
-		action.VendorRefill(true, true)
-		action.BuyAtVendor(npc.Akara, action.VendorItemRequest{
-			Item:     "AntidotePotion",
-			Quantity: potsToBuy,
-			Tab:      4,
-		})
-
-		a.ctx.HID.PressKeyBinding(a.ctx.Data.KeyBindings.Inventory)
-
-		x := 0
-		for _, itm := range a.ctx.Data.Inventory.ByLocation(item.LocationInventory) {
-			if itm.Name != "AntidotePotion" {
-				continue
-			}
-			pos := ui.GetScreenCoordsForItem(itm)
-			utils.Sleep(500)
-
-			if x > 3 {
-
-				a.ctx.HID.Click(game.LeftButton, pos.X, pos.Y)
-				utils.Sleep(300)
-				if a.ctx.Data.LegacyGraphics {
-					a.ctx.HID.Click(game.LeftButton, ui.MercAvatarPositionXClassic, ui.MercAvatarPositionYClassic)
-				} else {
-					a.ctx.HID.Click(game.LeftButton, ui.MercAvatarPositionX, ui.MercAvatarPositionY)
+			potsToBuy := 4
+			if a.ctx.Data.MercHPPercent() > 0 {
+				potsToBuy = 8
+				if a.ctx.CharacterCfg.HidePortraits && !a.ctx.Data.OpenMenus.PortraitsShown {
+					a.ctx.CharacterCfg.HidePortraits = false
+					reHidePortraits = true
+					a.ctx.HID.PressKey(a.ctx.Data.KeyBindings.ShowPortraits.Key1[0])
 				}
-
-			} else {
-				a.ctx.HID.Click(game.RightButton, pos.X, pos.Y)
 			}
-			x++
-		}
-		step.CloseAllMenus()
 
-		if reHidePortraits {
-			a.ctx.CharacterCfg.HidePortraits = true
+			action.VendorRefill(true, true)
+			action.BuyAtVendor(npc.Akara, action.VendorItemRequest{
+				Item:     "AntidotePotion",
+				Quantity: potsToBuy,
+				Tab:      4,
+			})
+
+			a.ctx.HID.PressKeyBinding(a.ctx.Data.KeyBindings.Inventory)
+
+			x := 0
+			for _, itm := range a.ctx.Data.Inventory.ByLocation(item.LocationInventory) {
+				if itm.Name != "AntidotePotion" {
+					continue
+				}
+				pos := ui.GetScreenCoordsForItem(itm)
+				utils.Sleep(500)
+
+				if x > 3 {
+
+					a.ctx.HID.Click(game.LeftButton, pos.X, pos.Y)
+					utils.Sleep(300)
+					if a.ctx.Data.LegacyGraphics {
+						a.ctx.HID.Click(game.LeftButton, ui.MercAvatarPositionXClassic, ui.MercAvatarPositionYClassic)
+					} else {
+						a.ctx.HID.Click(game.LeftButton, ui.MercAvatarPositionX, ui.MercAvatarPositionY)
+					}
+
+				} else {
+					a.ctx.HID.Click(game.RightButton, pos.X, pos.Y)
+				}
+				x++
+			}
+			step.CloseAllMenus()
+
+			if reHidePortraits {
+				a.ctx.CharacterCfg.HidePortraits = true
+			}
+			action.HidePortraits()
+			a.ctx.DisableItemPickup()
+			action.UsePortalInTown()
+
 		}
-		action.HidePortraits()
+
 		a.ctx.DisableItemPickup()
-		action.UsePortalInTown()
-		
+		action.MoveToCoords(andarielAttackPos1)
+
+		a.ctx.DisableItemPickup()
+		originalBackToTownCfg := a.ctx.CharacterCfg.BackToTown
+		a.ctx.CharacterCfg.BackToTown.NoHpPotions = false
+		a.ctx.CharacterCfg.BackToTown.NoMpPotions = false
+		a.ctx.CharacterCfg.BackToTown.EquipmentBroken = false
+		a.ctx.CharacterCfg.BackToTown.MercDied = false
+
+		defer func() {
+			a.ctx.CharacterCfg.BackToTown = originalBackToTownCfg
+			a.ctx.Logger.Info("Restored original back-to-town checks after Andariel fight.")
+		}()
 	}
-	
 
-		a.ctx.DisableItemPickup()
+	if !a.ctx.CharacterCfg.Game.Andariel.ClearRoom {
+
 		action.MoveToCoords(andarielAttackPos1)
-		
-				a.ctx.DisableItemPickup()
-				originalBackToTownCfg := a.ctx.CharacterCfg.BackToTown
-				a.ctx.CharacterCfg.BackToTown.NoHpPotions = false
-				a.ctx.CharacterCfg.BackToTown.NoMpPotions = false
-				a.ctx.CharacterCfg.BackToTown.EquipmentBroken = false
-				a.ctx.CharacterCfg.BackToTown.MercDied = false
-
-				defer func() {
-				a.ctx.CharacterCfg.BackToTown = originalBackToTownCfg
-				a.ctx.Logger.Info("Restored original back-to-town checks after Andariel fight.")
-				}()
-		
-		if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Normal{
-		
-		
-	/*	action.ClearAreaAroundPlayer(45, data.MonsterAnyFilter())
-		action.MoveToCoords(andarielAttackPos1)
-		action.ClearAreaAroundPlayer(45, data.MonsterAnyFilter())*/
-		}
-	
-}
-
-if !a.ctx.CharacterCfg.Game.Andariel.ClearRoom {
-		
-	action.MoveToCoords(andarielAttackPos1)
-}	
+	}
 
 	// Attacking Andariel
 	a.ctx.Logger.Info("Killing Andariel")
 	err = a.ctx.Char.KillAndariel()
-	
+
 	// Enable item pickup after the fight
 	a.ctx.EnableItemPickup()
 
