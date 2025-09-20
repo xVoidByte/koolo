@@ -5,16 +5,17 @@
 [name] == ethrune # # [maxquantity] == 1
 [name] == ralrune # # [maxquantity] == 3
 [name] == ortrune # # [maxquantity] == 3
-[name] == solrune # # [maxquantity] == 2
+[name] == solrune # # [maxquantity] == 3
 [name] == tirrune # # [maxquantity] == 2
 [name] == thulrune # # [maxquantity] == 3
 [name] == amnrune # # [maxquantity] == 2
-[name] == shaelrune # # [maxquantity] == 1
+[name] == shaelrune # # [maxquantity] == 2
 [name] == elrune # # [maxquantity] == 1
 [name] == nefrune # # [maxquantity] == 1
 [name] == lumrune # # [maxquantity] == 1
 [name] == korune # # [maxquantity] == 1
 [name] == helrune # # [maxquantity] == 5
+[name] == iorune # # [maxquantity] == 1
 [name] == lemrune
 [name] == pulrune
 [name] == umrune
@@ -92,6 +93,7 @@
 [type] == helm # [sockets] == 2 # # [maxquantity] == 1 // Lore
 [type] == scimitar # [sockets] == 2 # # [maxquantity] == 1 // steel
 [name] == shortstaff # [sockets] == 2 # # [maxquantity] == 1 //Leaf
+[type] == helm && [quality] <= superior # [sockets] == 3 # [maxquantity] == 1 // bulwark
 
 // Paladin Shields
 [name] == rondache && [flag] != ethereal # [sockets] == 4 # # [maxquantity] == 1
