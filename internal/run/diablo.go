@@ -163,6 +163,8 @@ func (d *Diablo) Run() error {
 
 	}
 
+			if d.ctx.CharacterCfg.Game.Diablo.KillDiablo {
+		
 		originalClearPathDistCfg := d.ctx.CharacterCfg.Character.ClearPathDist
 		d.ctx.CharacterCfg.Character.ClearPathDist = 0
 
@@ -183,6 +185,7 @@ func (d *Diablo) Run() error {
 		return d.ctx.Char.KillDiablo()
 
 	}
+
 
 	return nil
 }
