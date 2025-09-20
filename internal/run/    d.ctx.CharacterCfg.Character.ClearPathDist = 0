@@ -16,7 +16,8 @@ import (
 var diabloSpawnPosition = data.Position{X: 7792, Y: 5294}
 var chaosNavToPosition = data.Position{X: 7732, Y: 5292} //into path towards vizier
 
-type Diablo struct {	ctx *context.Status
+type Diablo struct {	
+ctx *context.Status
 }
 
 func NewDiablo() *Diablo {
