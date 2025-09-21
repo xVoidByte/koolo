@@ -245,6 +245,16 @@ func (b *Bot) Run(ctx context.Context, firstRun bool, runs []run.Run) error {
 				}
 				action.BuffIfRequired()
 
+				lvl, _ := b.ctx.Data.PlayerUnit.FindStat(stat.Level, 0)
+
+				MaxLevel := b.ctx.CharacterCfg.Game.StopLevelingAt
+
+				if lvl.Value >= MaxLevel && MaxLevel > 0 {
+					b.ctx.Logger.Info(fmt.Sprintf("Player reached level %d (>= MaxLevelAct1 %d). Triggering supervisor stop via context.", lvl.Value, MaxLevel), "run", "Leveling")
+					b.ctx.StopSupervisor()
+					return nil // Return nil to gracefully end the current run loop
+				}
+
 				isInTown := b.ctx.Data.PlayerUnit.Area.IsTown()
 
 				// Check potions in belt

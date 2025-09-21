@@ -22,6 +22,8 @@ var botContexts = make(map[uint64]*Status)
 
 type Priority int
 
+type StopFunc func()
+
 const (
 	PriorityHigh       = 0
 	PriorityNormal     = 1
@@ -36,25 +38,27 @@ type Status struct {
 }
 
 type Context struct {
-	Name              string
-	ExecutionPriority Priority
-	CharacterCfg      *config.CharacterCfg
-	Data              *game.Data
-	EventListener     *event.Listener
-	HID               *game.HID
-	Logger            *slog.Logger
-	Manager           *game.Manager
-	GameReader        *game.MemoryReader
-	MemoryInjector    *game.MemoryInjector
-	PathFinder        *pather.PathFinder
-	BeltManager       *health.BeltManager
-	HealthManager     *health.Manager
-	Char              Character
-	LastBuffAt        time.Time
-	ContextDebug      map[Priority]*Debug
-	CurrentGame       *CurrentGameHelper
-	SkillPointIndex int // NEW FIELD: Tracks the next skill to consider from the character's SkillPoints() list
-	ForceAttack       bool
+	Name               string
+	ExecutionPriority  Priority
+	CharacterCfg       *config.CharacterCfg
+	Data               *game.Data
+	EventListener      *event.Listener
+	HID                *game.HID
+	Logger             *slog.Logger
+	Manager            *game.Manager
+	GameReader         *game.MemoryReader
+	MemoryInjector     *game.MemoryInjector
+	PathFinder         *pather.PathFinder
+	BeltManager        *health.BeltManager
+	HealthManager      *health.Manager
+	Char               Character
+	LastBuffAt         time.Time
+	ContextDebug       map[Priority]*Debug
+	CurrentGame        *CurrentGameHelper
+	SkillPointIndex    int // NEW FIELD: Tracks the next skill to consider from the character's SkillPoints() list
+	ForceAttack        bool
+	StopSupervisorFn   StopFunc
+	CleanStopRequested bool
 }
 
 type Debug struct {
@@ -63,15 +67,25 @@ type Debug struct {
 }
 
 type CurrentGameHelper struct {
-	BlacklistedItems         []data.Item
-	PickedUpItems            map[int]int
-	AreaCorrection           struct {
+	BlacklistedItems []data.Item
+	PickedUpItems    map[int]int
+	AreaCorrection   struct {
 		Enabled      bool
 		ExpectedArea area.ID
 	}
-	PickupItems bool
+	PickupItems                bool
 	FailedToCreateGameAttempts int
-	FailedMenuAttempts int
+	FailedMenuAttempts         int
+}
+
+func (ctx *Context) StopSupervisor() {
+	if ctx.StopSupervisorFn != nil {
+		ctx.Logger.Info("Game logic requested supervisor stop.", "source", "context")
+		ctx.CleanStopRequested = true // SET THE FLAG
+		ctx.StopSupervisorFn()
+	} else {
+		ctx.Logger.Warn("StopSupervisorFn is not set. Cannot stop supervisor from context.")
+	}
 }
 
 func NewContext(name string) *Status {
@@ -86,9 +100,9 @@ func NewContext(name string) *Status {
 			PriorityPause:      {},
 			PriorityStop:       {},
 		},
-		CurrentGame: NewGameHelper(),
+		CurrentGame:     NewGameHelper(),
 		SkillPointIndex: 0,
-		ForceAttack: false,
+		ForceAttack:     false,
 	}
 	botContexts[getGoroutineID()] = &Status{Priority: PriorityNormal, Context: ctx}
 
@@ -100,7 +114,7 @@ func NewGameHelper() *CurrentGameHelper {
 		PickupItems:                true,
 		PickedUpItems:              make(map[int]int),
 		BlacklistedItems:           []data.Item{},
-		FailedToCreateGameAttempts: 0, 
+		FailedToCreateGameAttempts: 0,
 	}
 }
 

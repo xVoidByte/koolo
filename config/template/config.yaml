@@ -12,6 +12,7 @@ classicMode: false # Set to true to use legacy graphics
 closeMiniPanel: false # Set to true to close the mini panel at start of game in legacy graphics
 hidePortraits: true  # Set to true to hide mercenary and other players portraits (avatar)
 enableCubeRecipes: true # Enable cubing of flawlesses and tokens
+stopLevelingAt: 0
 
 scheduler:
   enabled: false
