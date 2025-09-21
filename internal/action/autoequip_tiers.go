@@ -73,22 +73,22 @@ var (
 	}
 
 	uniqueItemScores = map[item.Name]float64{
-		item.Name(item.ThudergodsVigor):      3000.0,
-		item.Name(item.SkinoftheVipermagi):	  1000.0,
-		item.Name(item.ArachnidMesh):           3000.0,
-		item.Name(item.NosferatusCoil):        3000.0,
-		item.Name(item.VerdugosHeartyCord):   3000.0,
-		item.Name(item.Bladebuckle):           3000.0,
-		item.Name(item.StringofEars):          3000.0,
-		item.Name(item.Razortail):             3000.0,
-		item.Name(item.Gloomstrap):            3000.0,
-		item.Name(item.Snowclash):             3000.0,
-		item.Name(item.Nightsmoke):            2000.0,
-		item.Name(item.Goldwrap):              2000.0,
-		item.Name(item.Snakecord):             1000.0,
-		item.Name(item.LenymsCord):                0.0,
+		item.Name(item.ThudergodsVigor):    3000.0,
+		item.Name(item.SkinoftheVipermagi): 1000.0,
+		item.Name(item.ArachnidMesh):       3000.0,
+		item.Name(item.NosferatusCoil):     3000.0,
+		item.Name(item.VerdugosHeartyCord): 3000.0,
+		item.Name(item.Bladebuckle):        3000.0,
+		item.Name(item.StringofEars):       3000.0,
+		item.Name(item.Razortail):          3000.0,
+		item.Name(item.Gloomstrap):         3000.0,
+		item.Name(item.Snowclash):          3000.0,
+		item.Name(item.Nightsmoke):         2000.0,
+		item.Name(item.Goldwrap):           2000.0,
+		item.Name(item.Snakecord):          1000.0,
+		item.Name(item.LenymsCord):         0.0,
 	}
-	
+
 	classWeightModifiers = map[data.Class]map[stat.ID]float64{
 		data.Amazon: {
 			stat.CannotBeFrozen:       75.0,
@@ -603,7 +603,6 @@ func calculateSkillScore(itm data.Item) float64 {
 
 // MercScore calculates mercenary-specific item score
 func MercScore(itm data.Item) map[item.LocationType]float64 {
-	//ctx := context.Get()
 	// Get all possible body locations for this item
 	bodyLocs := itm.Desc().GetType().BodyLocs
 	if len(bodyLocs) == 0 {
@@ -614,6 +613,13 @@ func MercScore(itm data.Item) map[item.LocationType]float64 {
 	scores := make(map[item.LocationType]float64)
 
 	for _, loc := range bodyLocs {
+		score, isMetaItem := getMercenaryMetaItemScore(itm)
+
+		if isMetaItem {
+			scores[loc] = score
+			continue
+		}
+
 		totalScore := BaseScore + sumElementalDamage(itm)*2.0
 
 		// Base stats

@@ -170,7 +170,7 @@ func (a Leveling) act1() error {
 
 // setupLevelOneConfig centralizes the configuration logic for a new character.
 func (a Leveling) setupLevelOneConfig() {
-	enabledRunewordRecipes := []string{"Stealth", "Ancients' Pledge", "Lore", "Insight", "Spirit", "Smoke", "Treachery", "Heart of the Oak", "Call to Arms", "Bulwark"}
+	enabledRunewordRecipes := []string{"Stealth", "Ancients' Pledge", "Lore", "Insight", "Spirit", "Smoke", "Treachery", "Heart of the Oak", "Call to Arms", "Bulwark", "Hustle"}
 
 	if a.ctx.CharacterCfg.Character.Class == "paladin" {
 		enabledRunewordRecipes = append(enabledRunewordRecipes, "Steel")
@@ -396,8 +396,9 @@ func (a Leveling) shouldFarmCountessForRunes() bool {
 		"SolRune":   3,
 		"RalRune":   2,
 		"NefRune":   2,
-		"ShaelRune": 2,
+		"ShaelRune": 3,
 		"IoRune":    1,
+		"EldRune":   1,
 	}
 
 	ownedRunes := make(map[string]int)
@@ -423,4 +424,3 @@ func (a Leveling) shouldFarmCountessForRunes() bool {
 	a.ctx.Logger.Info("All required runes are present. Skipping Countess farm.")
 	return false
 }
-
