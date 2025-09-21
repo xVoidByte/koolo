@@ -137,6 +137,7 @@ type CharacterCfg struct {
 		MinGoldPickupThreshold int                   `yaml:"minGoldPickupThreshold"`
 		UseCainIdentify        bool                  `yaml:"useCainIdentify"`
 		InteractWithShrines    bool                  `yaml:"interactWithShrines"`
+		StopLevelingAt         int                   `yaml:"stopLevelingAt"`
 		ClearTPArea            bool                  `yaml:"clearTPArea"`
 		Difficulty             difficulty.Difficulty `yaml:"difficulty"`
 		RandomizeRuns          bool                  `yaml:"randomizeRuns"`
@@ -408,7 +409,7 @@ func Load() error {
 								os.WriteFile(filepath.Join(tempDir, file.Name()), sourceData, 0644)
 							}
 						}
-						
+
 						fallbackRules, _ := nip.ReadDir(tempDir + "\\")
 						rules = append(rules, fallbackRules...)
 						os.RemoveAll(tempDir)

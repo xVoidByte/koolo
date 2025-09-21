@@ -278,8 +278,18 @@ func (mng *SupervisorManager) buildSupervisor(supervisorName string, logger *slo
 		return nil, nil, err
 	}
 
+	supervisor.GetContext().StopSupervisorFn = supervisor.Stop
+
 	// This function will be used to restart the client - passed to the crashDetector
 	restartFunc := func() {
+
+		ctx := supervisor.GetContext()
+		if ctx.CleanStopRequested {
+			mng.logger.Info("Supervisor stopped cleanly by game logic. Preventing restart.", slog.String("supervisor", supervisorName))
+			mng.Stop(supervisorName)
+			return
+		}
+
 		mng.logger.Info("Restarting supervisor after crash", slog.String("supervisor", supervisorName))
 		mng.Stop(supervisorName)
 		time.Sleep(5 * time.Second) // Wait a bit before restarting
