@@ -6,7 +6,7 @@ import (
 )
 
 func getMercenaryMetaItemScore(it data.Item) (float64, bool) {
-	name := getItemNameForMetaScore(it)
+	name := getItemNameForScore(it)
 
 	if score, found := MercenaryMetaHelmetScore[name]; found {
 		return score, found
@@ -23,7 +23,7 @@ func getMercenaryMetaItemScore(it data.Item) (float64, bool) {
 	return 0.0, false
 }
 
-func getItemNameForMetaScore(it data.Item) item.Name {
+func getItemNameForScore(it data.Item) item.Name {
 	if it.IsRuneword {
 		return item.Name(it.RunewordName)
 	}

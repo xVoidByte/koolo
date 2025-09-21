@@ -1,8 +1,6 @@
 package action
 
 import (
-	"fmt"
-
 	"github.com/hectorgimenez/d2go/pkg/data"
 	"github.com/hectorgimenez/d2go/pkg/data/difficulty"
 	"github.com/hectorgimenez/d2go/pkg/data/item"
@@ -605,8 +603,6 @@ func calculateSkillScore(itm data.Item) float64 {
 
 // MercScore calculates mercenary-specific item score
 func MercScore(itm data.Item) map[item.LocationType]float64 {
-	ctx := context.Get()
-
 	// Get all possible body locations for this item
 	bodyLocs := itm.Desc().GetType().BodyLocs
 	if len(bodyLocs) == 0 {
@@ -620,7 +616,6 @@ func MercScore(itm data.Item) map[item.LocationType]float64 {
 		score, isMetaItem := getMercenaryMetaItemScore(itm)
 
 		if isMetaItem {
-			ctx.Logger.Debug(fmt.Sprintf("Item %s is a mercenary meta item with score %.1f", getItemNameForMetaScore(itm), score))
 			scores[loc] = score
 			continue
 		}
