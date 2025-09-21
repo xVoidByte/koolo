@@ -9,10 +9,11 @@
 [name] == tirrune # # [maxquantity] == 1
 [name] == thulrune # # [maxquantity] == 3
 [name] == amnrune # # [maxquantity] == 2
-[name] == shaelrune # # [maxquantity] == 2
+[name] == shaelrune # # [maxquantity] == 3
+[name] == eldrune # # [maxquantity] == 1
 [name] == nefrune # # [maxquantity] == 1
 [name] == lumrune # # [maxquantity] == 1
-[name] == korune # # [maxquantity] == 1
+[name] == korune # # [maxquantity] == 2
 [name] == helrune # # [maxquantity] == 5
 [name] == iorune # # [maxquantity] == 1
 [name] == lemrune
