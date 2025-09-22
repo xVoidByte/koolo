@@ -140,6 +140,7 @@ func itemsToIdentify() (items []data.Item) {
 		}
 
 		// Skip identifying items that fully match a rule when unid and we're not leveling
+		_, isLevelingChar := ctx.Char.(context.LevelingCharacter)
 
 		if !isLevelingChar {
 
