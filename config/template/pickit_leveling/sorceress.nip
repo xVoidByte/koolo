@@ -61,28 +61,3 @@
 [name] == supermanapotion
 [name] == rejuvenationpotion
 [name] == fullrejuvenationpotion
-
-//Bases
-([Name] == CrystalSword || [Name] == BroadSword) && [Quality] <= Superior && [Flag] != Ethereal # [Sockets] == 4 # [MaxQuantity] == 1 // spirit
-[type] == polearm && [quality] <= superior # [sockets] == 4 # [MaxQuantity] == 1 // any insight polearm
-[type] == polearm && [quality] <= superior && [flag] == ethereal && [Class] >= elite # [sockets] == 4 # [MaxQuantity] == 1
-[type] == polearm && [quality] <= superior && [flag] == ethereal && [Class] >= exceptional # [sockets] == 4 # [MaxQuantity] == 1
-[Type] == Armor && [Quality] <= Superior && [Flag] != Ethereal # [Sockets] == 2 # [MaxQuantity] == 1
-[Type] == Armor && [Quality] <= Superior && [Flag] != Ethereal # [Sockets] == 3 # [MaxQuantity] == 1
-[type] == helm && [Quality] <= Superior && [Flag] != Ethereal # [Sockets] == 2 # [MaxQuantity] == 1
-[name] == monarch && [quality] <= superior # [sockets] == 4 # [maxquantity] == 1
-[Type] == Shield && [quality] <= superior # [sockets] == 3 # [maxquantity] == 1
-[type] == helm && [quality] <= superior # [sockets] == 3 # [maxquantity] == 1 // bulwark
-
-//Force Identifying of all Set and Unique items to run them through Autoequip Check
-[Type] == Polearm && [quality] >= set # [fireresist] > 9000
-[Type] == Orb && [quality] >= set # [fireresist] > 9000
-[Type] == helm && [quality] >= set # [fireresist] > 9000
-[Type] == circlet&& [quality] >= set # [fireresist] > 9000
-[Type] == gloves && [quality] >= set # [fireresist] > 9000
-[Type] == boots && [quality] >= set # [fireresist] > 9000
-[Type] == belt && [quality] >= set # [fireresist] > 9000
-[Type] == armor && [quality] >= set # [fireresist] > 9000
-[Type] == shield && [quality] >= set # [fireresist] > 9000
-[Type] == ring && [quality] >= set # [fireresist] > 9000
-[Type] == amulet && [quality] >= set # [fireresist] > 9000
