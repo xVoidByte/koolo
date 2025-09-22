@@ -76,23 +76,3 @@
 [Type] == Armor && [Quality] <= Superior && [Flag] != Ethereal # [Sockets] == 3 # [MaxQuantity] == 1
 [type] == helm && [Quality] <= Superior && [Flag] != Ethereal # [Sockets] == 2 # [MaxQuantity] == 1
 [type] == helm && [quality] <= superior # [sockets] == 3 # [maxquantity] == 1 // bulwark
-
-//Force Identifying of all Set and Unique items to run them through Autoequip Check
-[Type] == Polearm && [quality] >= set # [fireresist] > 9000
-[Type] == AssassinClaw && [quality] >= set # [fireresist] > 9000
-[Type] == Handtohand && [quality] >= set # [fireresist] > 9000
-[Type] == helm && [quality] >= set # [fireresist] > 9000
-[Type] == circlet&& [quality] >= set # [fireresist] > 9000
-[Type] == gloves && [quality] >= set # [fireresist] > 9000
-[Type] == boots && [quality] >= set # [fireresist] > 9000
-[Type] == belt && [quality] >= set # [fireresist] > 9000
-[Type] == armor && [quality] >= set # [fireresist] > 9000
-[Type] == shield && [quality] >= set # [fireresist] > 9000
-[Type] == ring && [quality] >= set # [fireresist] > 9000
-[Type] == amulet && [quality] >= set # [fireresist] > 9000
-
-[Type] == Scepter && [quality] >= set # [fireresist] > 9000
-[Type] == Hammer && [quality] >= set # [fireresist] > 9000
-[Type] == Mace && [quality] >= set # [fireresist] > 9000
-[Type] == Sword && [quality] >= set # [fireresist] > 9000
-[Type] == Axe && [quality] >= set # [fireresist] > 9000
