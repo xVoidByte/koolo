@@ -44,6 +44,11 @@ func (a Leveling) act1() error {
 
 	// --- Quest and Farming Logic ---
 
+	if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Hell && lvl.Value < 80 {
+
+		return NewMausoleum().Run()
+	}
+
 	// Farming for low gold
 	if a.ctx.Data.PlayerUnit.TotalPlayerGold() < 50000 {
 		if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare {
