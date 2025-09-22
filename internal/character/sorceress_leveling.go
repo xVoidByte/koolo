@@ -109,20 +109,21 @@ var blizzardSkillSequence = []skill.ID{
 	skill.GlacialSpike, skill.GlacialSpike, //spent 17
 
 	skill.IceBlast, skill.IceBlast, skill.IceBlast, skill.IceBlast, skill.IceBlast, //spent 22
-	skill.IceBlast, skill.IceBlast, skill.IceBlast, skill.IceBlast, //spent all points that are available at level 24 (23+2 den of evil + rada)
+	skill.IceBlast, skill.IceBlast, skill.IceBlast, skill.IceBlast, // spent 26 (all points that are available at level 24 (23+2 den of evil + rada))
 
-	skill.Blizzard, skill.Blizzard, skill.Blizzard, skill.Blizzard, skill.Blizzard,
-	skill.Blizzard, skill.Blizzard, skill.Blizzard, skill.ColdMastery, skill.Blizzard,
+	skill.Blizzard, skill.Blizzard, skill.Blizzard, skill.Blizzard, skill.Blizzard, //spent 31
+	skill.Blizzard, skill.Blizzard, skill.Blizzard, skill.ColdMastery, skill.Blizzard, //spent 36
 
-	skill.Blizzard, skill.Blizzard, skill.Blizzard, skill.Blizzard, skill.Blizzard,
-	skill.Blizzard, skill.Blizzard, skill.Blizzard, skill.Blizzard, skill.Blizzard,
+	skill.Blizzard, skill.Blizzard, skill.Blizzard, skill.Blizzard, skill.Blizzard, //spent 41
+	skill.Blizzard, skill.Blizzard, skill.Blizzard, skill.Blizzard, skill.Blizzard, //spent 46
 
-	skill.ColdMastery, skill.ColdMastery, skill.ColdMastery, skill.ColdMastery,
-	skill.ColdMastery, skill.ColdMastery, skill.ColdMastery, skill.ColdMastery, skill.ColdMastery,
-	skill.ColdMastery, skill.ColdMastery, skill.ColdMastery, skill.ColdMastery, skill.ColdMastery,
+	skill.ColdMastery, skill.ColdMastery, skill.ColdMastery, skill.ColdMastery, //spent 50
+	skill.ColdMastery, skill.ColdMastery, skill.ColdMastery, skill.ColdMastery, skill.ColdMastery, //spent 55
+	skill.ColdMastery, skill.ColdMastery, skill.ColdMastery, skill.ColdMastery, skill.ColdMastery, //spent 60
 	skill.ColdMastery, skill.ColdMastery,
 
 	skill.GlacialSpike, skill.GlacialSpike, skill.GlacialSpike, skill.GlacialSpike, skill.GlacialSpike, // Total 10 points in Glacial Spike
+	skill.ChargedBolt, skill.Lightning, skill.ChainLightning, skill.EnergyShield,
 	skill.GlacialSpike, skill.GlacialSpike, skill.GlacialSpike, skill.GlacialSpike, skill.GlacialSpike,
 	skill.GlacialSpike, skill.GlacialSpike,
 
