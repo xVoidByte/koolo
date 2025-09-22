@@ -139,9 +139,14 @@ func itemsToIdentify() (items []data.Item) {
 			continue
 		}
 
-		// Skip identifying items that fully match a rule when unid
-		if _, result := ctx.CharacterCfg.Runtime.Rules.EvaluateAll(i); result == nip.RuleResultFullMatch {
-			continue
+		// Skip identifying items that fully match a rule when unid and we're not leveling
+		_, isLevelingChar := ctx.Char.(context.LevelingCharacter)
+
+		if !isLevelingChar {
+
+			if _, result := ctx.CharacterCfg.Runtime.Rules.EvaluateAll(i); result == nip.RuleResultFullMatch {
+				continue
+			}
 		}
 
 		items = append(items, i)
