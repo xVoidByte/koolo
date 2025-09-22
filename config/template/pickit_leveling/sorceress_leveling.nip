@@ -61,3 +61,16 @@
 [name] == supermanapotion
 [name] == rejuvenationpotion
 [name] == fullrejuvenationpotion
+
+//Bases
+
+([Name] == CrystalSword || [Name] == BroadSword) && [Quality] <= Superior && [Flag] != Ethereal # [Sockets] == 4 # [MaxQuantity] == 1 // spirit
+[type] == polearm && [quality] <= superior # [sockets] == 4 # [MaxQuantity] == 1 // any insight polearm
+[type] == polearm && [quality] <= superior && [flag] == ethereal && [Class] >= elite # [sockets] == 4 # [MaxQuantity] == 1
+[type] == polearm && [quality] <= superior && [flag] == ethereal && [Class] >= exceptional # [sockets] == 4 # [MaxQuantity] == 1
+[Type] == Armor && [Quality] <= Superior && [Flag] != Ethereal # [Sockets] == 2 # [MaxQuantity] == 1
+[Type] == Armor && [Quality] <= Superior && [Flag] != Ethereal # [Sockets] == 3 # [MaxQuantity] == 1
+[type] == helm && [Quality] <= Superior && [Flag] != Ethereal # [Sockets] == 2 # [MaxQuantity] == 1
+[name] == monarch && [quality] <= superior # [sockets] == 4 # [maxquantity] == 1
+[Type] == Shield && [quality] <= superior # [sockets] == 3 # [maxquantity] == 1
+[type] == helm && [quality] <= superior # [sockets] == 3 # [maxquantity] == 1 // bulwark
