@@ -20,10 +20,6 @@ func PreRun(firstRun bool) error {
 	ClearMessages()
 	RefillBeltFromInventory()
 
-	if firstRun {
-		Stash(false)
-	}
-
 	UpdateQuestLog()
 
 	_, isLevelingChar := ctx.Char.(context.LevelingCharacter)
@@ -36,6 +32,10 @@ func PreRun(firstRun bool) error {
 
 	// Identify - either via Cain or Tome
 	IdentifyAll(false)
+
+	if firstRun {
+		Stash(false)
+	}
 
 	if ctx.CharacterCfg.Game.Leveling.AutoEquip && isLevelingChar {
 		AutoEquip()
