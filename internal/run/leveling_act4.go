@@ -87,6 +87,21 @@ func (a Leveling) act4() error {
 		return nil
 	}
 
+	if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Hell && lvl.Value < 90 {
+
+		a.ctx.Logger.Info("Under level 90 we assume we must still farm items")
+
+		NewLowerKurastChest().Run()
+		NewMephisto(nil).Run()
+		NewMausoleum().Run()
+		err := action.WayPoint(area.ThePandemoniumFortress)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
 	if (a.ctx.CharacterCfg.Game.Difficulty == difficulty.Normal && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 30000) ||
 		(a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 50000) ||
 		(a.ctx.CharacterCfg.Game.Difficulty == difficulty.Hell && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 70000) {
@@ -94,8 +109,7 @@ func (a Leveling) act4() error {
 		a.ctx.Logger.Info("Low on gold. Initiating Chest Run.")
 
 		NewLowerKurastChest().Run()
-		NewMephisto(nil).Run()
-		NewMausoleum().Run()
+
 		err := action.WayPoint(area.ThePandemoniumFortress)
 		if err != nil {
 			return err
