@@ -93,7 +93,15 @@ func (a Leveling) act4() error {
 
 		a.ctx.Logger.Info("Low on gold. Initiating Chest Run.")
 
-		return NewLowerKurastChest().Run()
+		NewLowerKurastChest().Run()
+		NewMephisto(nil).Run()
+		NewMausoleum().Run()
+		err := action.WayPoint(area.ThePandemoniumFortress)
+		if err != nil {
+			return err
+		}
+
+		return nil
 	}
 
 	if !a.ctx.Data.Quests[quest.Act4TheFallenAngel].Completed() {
@@ -204,4 +212,3 @@ func (a Leveling) OuterSteppes() error {
 
 	return nil
 }
-
