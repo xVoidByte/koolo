@@ -3,21 +3,33 @@ package action
 import (
 	"github.com/hectorgimenez/d2go/pkg/data"
 	"github.com/hectorgimenez/d2go/pkg/data/item"
+	"github.com/hectorgimenez/d2go/pkg/data/stat"
 )
 
 func getMercenaryMetaItemScore(it data.Item) (float64, bool) {
 	name := getItemNameForScore(it)
+	totalScore := 0.0
 
 	if score, found := MercenaryMetaHelmetScore[name]; found {
-		return score, found
+		totalScore += score
 	}
 
 	if score, found := MercenaryMetaArmorScore[name]; found {
-		return score, found
+		totalScore += score
 	}
 
 	if score, found := MercenaryMetaWeaponScore[name]; found {
-		return score, found
+		totalScore += score
+	}
+
+	if bonusCalculators, found := itemBonusScoreCalculator[name]; found {
+		for _, calculator := range bonusCalculators {
+			totalScore += calculator(it)
+		}
+	}
+
+	if totalScore > 0 {
+		return totalScore, true
 	}
 
 	return 0.0, false
@@ -57,4 +69,64 @@ var (
 	MercenaryMetaWeaponScore = map[item.Name]float64{
 		item.Name(item.RunewordInsight): 2000.0,
 	}
+
+	PolearmTypeScore = map[string]float64{
+		// Elite
+		"GiantThresher":  150.0,
+		"Thresher":       140.0,
+		"GreatPoleaxe":   130.0,
+		"CrypticAxe":     120.0,
+		"ColossusVoulge": 110.0,
+
+		// Exceptional
+		"GrimScythe":   100.0,
+		"BattleScythe": 90.0,
+		"BecDeCorbin":  80.0,
+		"Partizan":     70.0,
+		"Bill":         60.0,
+
+		// Normal
+		"WarScythe": 50.0,
+		"Scythe":    40.0,
+		"Halberd":   30.0,
+		"Poleaxe":   20.0,
+		"Voulge":    10.0,
+	}
+
+	itemBonusScoreCalculator = map[item.Name][]func(it data.Item) float64{
+		item.Name(item.RunewordInsight): {getInsightDamageScore, getInsightAuraScore, getInsightWeaponTypeScore},
+	}
 )
+
+func getInsightWeaponTypeScore(it data.Item) float64 {
+	if score, found := PolearmTypeScore[string(it.Name)]; found {
+		return score
+	}
+
+	return 0.0
+}
+
+func getInsightDamageScore(it data.Item) float64 {
+	score := 0.0
+	baseMaxDamageData, foundBaseMaxDamageData := it.BaseStats.FindStat(stat.TwoHandedMaxDamage, 0)
+	maxDamageData, foundMaxDamageData := it.Stats.FindStat(stat.TwoHandedMaxDamage, 0)
+
+	if foundBaseMaxDamageData && foundMaxDamageData {
+		baseMaxDamage := baseMaxDamageData.Value
+		maxDamage := maxDamageData.Value
+		score = (float64(maxDamage) - float64(baseMaxDamage)) / float64(baseMaxDamage)
+	}
+
+	return score
+}
+
+func getInsightAuraScore(it data.Item) float64 {
+	score := 0.0
+	data, found := it.Stats.FindStat(stat.Aura, 120)
+
+	if found {
+		score = float64(data.Value) / 10
+	}
+
+	return score
+}
