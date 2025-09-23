@@ -114,6 +114,15 @@ func AutoEquip() error {
 
 		if !playerChanged && !mercChanged {
 			ctx.Logger.Debug("Equipment is stable, no changes made.")
+			ctaChanged, err := equipCTAIfFound(allItems)
+			if err != nil {
+				ctx.Logger.Error(fmt.Sprintf("CTA equip error: %v", err))
+			}
+			if ctaChanged {
+				*ctx.Data = ctx.GameReader.GetData()
+				continue
+			}
+
 			return nil
 		}
 
@@ -121,6 +130,70 @@ func AutoEquip() error {
 		*ctx.Data = ctx.GameReader.GetData()
 		ctx.Logger.Debug("Equipment changed, re-evaluating for stability...")
 	}
+}
+
+func equipCTAIfFound(allItems []data.Item) (bool, error) {
+	ctx := context.Get()
+	var ctaWeapon data.Item
+	var spiritShield data.Item
+	foundCta := false
+	foundSpirit := false
+
+	for _, itm := range allItems {
+		if itm.RunewordName == item.RunewordCallToArms {
+			ctaWeapon = itm
+			foundCta = true
+		}
+		if itm.RunewordName == item.RunewordSpirit && slices.Contains(shieldTypes, string(itm.Desc().Type)) {
+			if itm.Location.LocationType != item.LocationEquipped {
+				spiritShield = itm
+				foundSpirit = true
+			}
+		}
+	}
+
+	if !foundCta {
+		return false, nil
+	}
+
+	// Check secondary weapon slot
+	ctx.HID.PressKeyBinding(ctx.Data.KeyBindings.SwapWeapons)
+	utils.Sleep(EquipDelayMS)
+	*ctx.Data = ctx.GameReader.GetData()
+
+	equippedWeapon := GetEquippedItem(ctx.Data.Inventory, item.LocLeftArm)
+	equippedShield := GetEquippedItem(ctx.Data.Inventory, item.LocRightArm)
+	changed := false
+
+	if equippedWeapon.RunewordName != item.RunewordCallToArms {
+		ctx.Logger.Info("Equipping Call to Arms on secondary slot")
+		err := equip(ctaWeapon, item.LocLeftArm, item.LocationEquipped)
+		if err != nil {
+			ctx.Logger.Error(fmt.Sprintf("Failed to equip CTA: %v", err))
+		} else {
+			changed = true
+		}
+	}
+
+	if foundSpirit && equippedShield.RunewordName != item.RunewordSpirit {
+		// Only equip spirit if CTA is one handed
+		if _, isTwoHanded := ctaWeapon.FindStat(stat.TwoHandedMinDamage, 0); !isTwoHanded {
+			ctx.Logger.Info("Equipping Spirit on secondary slot")
+			err := equip(spiritShield, item.LocRightArm, item.LocationEquipped)
+			if err != nil {
+				ctx.Logger.Error(fmt.Sprintf("Failed to equip Spirit: %v", err))
+			} else {
+				changed = true
+			}
+		}
+	}
+
+	// Switch back to primary
+	ctx.HID.PressKeyBinding(ctx.Data.KeyBindings.SwapWeapons)
+	utils.Sleep(EquipDelayMS)
+	*ctx.Data = ctx.GameReader.GetData()
+
+	return changed, nil
 }
 
 // isEquippable checks if an item can be equipped, considering the stats of the item that would be unequipped.
