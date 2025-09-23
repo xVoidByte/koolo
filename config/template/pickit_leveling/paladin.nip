@@ -85,10 +85,12 @@
 
 // Bases
 [name] == crystalsword && [flag] != ethereal # [sockets] == 4 # # [maxquantity] == 1 // Spirit
-[name] == crystalsword && [flag] != ethereal # # [maxquantity] == 1 // Spirit
+[Name] == Flail && [Quality] <= Superior && [Flag] != Ethereal # [Sockets] == 5 # [MaxQuantity] == 1 // CTA
 [type] == shield # [sockets] == 4 # # [maxquantity] == 1 // Spirit
 [type] == shield # [sockets] == 3  # # [maxquantity] == 1 // Ancient's Pledge
-[type] == polearm # [sockets] == 4  # # [maxquantity] == 1 // Insight
+[type] == polearm && [quality] <= superior # [sockets] == 4 # [MaxQuantity] == 1 // any insight polearm
+[type] == polearm && [quality] <= superior && [flag] == ethereal && [Class] == elite # [sockets] == 4
+[type] == polearm && [quality] <= superior && [flag] == ethereal && [Class] == exceptional # [sockets] == 4 # [MaxQuantity] == 1
 [type] == armor # [sockets] == 3 # # [maxquantity] == 1 // Treachery
 [type] == armor # [sockets] == 2 # # [maxquantity] == 1 // Stealth
 [type] == helm # [sockets] == 2 # # [maxquantity] == 1 // Lore
