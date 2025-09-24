@@ -670,7 +670,7 @@ func (s SorceressLeveling) SkillsToBind() (skill.ID, []skill.ID) {
 		skillBindings = append(skillBindings, skill.FireBall)
 	}
 
-	if level.Value >= 55 {
+	if s.Data.PlayerUnit.Skills[skill.EnergyShield].Level > 0 
 		skillBindings = append(skillBindings, skill.EnergyShield)
 	}
 
