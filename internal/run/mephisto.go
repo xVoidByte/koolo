@@ -139,7 +139,7 @@ func (m Mephisto) Run() error {
 
 		if isLevelingChar {
 			utils.Sleep(1000)
-			m.HoldKey(win.VK_ESCAPE, 2000)
+			m.HoldKey(win.VK_SPACE, 2000)
 
 			utils.Sleep(1000)
 
