@@ -674,6 +674,14 @@ func (s SorceressLeveling) SkillsToBind() (skill.ID, []skill.ID) {
 		skillBindings = append(skillBindings, skill.EnergyShield)
 	}
 
+	if s.Data.PlayerUnit.Skills[skill.BattleCommand].Level > 0 {
+		skillBindings = append(skillBindings, skill.BattleCommand)
+	}
+
+	if s.Data.PlayerUnit.Skills[skill.BattleOrders].Level > 0 {
+		skillBindings = append(skillBindings, skill.BattleOrders)
+	}
+
 	mainSkill := skill.AttackSkill
 	if s.Data.PlayerUnit.Skills[skill.Blizzard].Level > 0 {
 		mainSkill = skill.Blizzard

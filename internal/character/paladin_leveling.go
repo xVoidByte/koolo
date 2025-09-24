@@ -10,12 +10,12 @@ import (
 	"github.com/hectorgimenez/d2go/pkg/data"
 	"github.com/hectorgimenez/d2go/pkg/data/item"
 	"github.com/hectorgimenez/d2go/pkg/data/npc"
+	"github.com/hectorgimenez/d2go/pkg/data/quest"
 	"github.com/hectorgimenez/d2go/pkg/data/skill"
 	"github.com/hectorgimenez/d2go/pkg/data/stat"
 	"github.com/hectorgimenez/koolo/internal/action/step"
 	"github.com/hectorgimenez/koolo/internal/context"
 	"github.com/hectorgimenez/koolo/internal/game"
-	"github.com/hectorgimenez/d2go/pkg/data/quest"
 )
 
 const (
@@ -184,11 +184,11 @@ func (s PaladinLeveling) SkillsToBind() (skill.ID, []skill.ID) {
 	if lvl.Value >= 6 {
 		skillBindings = append(skillBindings, skill.Vigor)
 	}
-	
+
 	if lvl.Value >= 24 {
 		skillBindings = append(skillBindings, skill.BlessedHammer)
 	}
-	
+
 	if lvl.Value >= 30 {
 		skillBindings = append(skillBindings, skill.HolyShield)
 	}
@@ -201,6 +201,14 @@ func (s PaladinLeveling) SkillsToBind() (skill.ID, []skill.ID) {
 		mainSkill = skill.Sacrifice
 	} else {
 		mainSkill = skill.Zeal
+	}
+
+	if s.Data.PlayerUnit.Skills[skill.BattleCommand].Level > 0 {
+		skillBindings = append(skillBindings, skill.BattleCommand)
+	}
+
+	if s.Data.PlayerUnit.Skills[skill.BattleOrders].Level > 0 {
+		skillBindings = append(skillBindings, skill.BattleOrders)
 	}
 
 	_, found := s.Data.Inventory.Find(item.TomeOfTownPortal, item.LocationInventory)
@@ -322,7 +330,7 @@ func (s PaladinLeveling) SkillPoints() []skill.ID {
 	}
 
 	skillsToAllocate := make([]skill.ID, 0)
-	
+
 	var uniqueSkills []skill.ID
 	seenSkills := make(map[skill.ID]bool)
 	for _, sk := range skillSequence {
@@ -648,5 +656,3 @@ func (s PaladinLeveling) KillBaal() error {
 	}
 
 }
-
-
