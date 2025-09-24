@@ -508,18 +508,18 @@ func (s SorceressLeveling) KillMonsterSequence(
 			if _, found := s.Data.KeyBindings.KeyBindingForSkill(skill.Blizzard); found {
 				if s.Data.PlayerUnit.States.HasState(state.Cooldown) {
 					if s.Data.PlayerUnit.Skills[skill.GlacialSpike].Level > 0 {
-						if _, found := s.Data.KeyBindings.KeyBindingForSkill(skill.GlacialSpike); found {
-							if s.isPlayerDead() {
-								return nil
-							}
-							if s.Data.PlayerUnit.Mode != mode.CastingSkill {
-								s.Logger.Debug("Blizzard on cooldown, attempting to cast Glacial Spike (Main).")
-								step.SecondaryAttack(skill.GlacialSpike, id, 1, glacialSpikeAttackOption)
-							} else {
-								s.Logger.Debug("Player is busy, waiting to cast Glacial Spike (Main).")
-								time.Sleep(time.Millisecond * 50)
-							}
+
+						if s.isPlayerDead() {
+							return nil
 						}
+						if s.Data.PlayerUnit.Mode != mode.CastingSkill {
+							s.Logger.Debug("Blizzard on cooldown, attempting to cast Glacial Spike (Main).")
+							step.PrimaryAttack(id, 2, true, glacialSpikeAttackOption)
+						} else {
+							s.Logger.Debug("Player is busy, waiting to cast Glacial Spike (Main).")
+							time.Sleep(time.Millisecond * 50)
+						}
+
 					}
 				} else {
 					if s.isPlayerDead() {
@@ -657,10 +657,6 @@ func (s SorceressLeveling) SkillsToBind() (skill.ID, []skill.ID) {
 	}
 
 	if level.Value >= 24 {
-		skillBindings = append(skillBindings, skill.GlacialSpike)
-	}
-
-	if level.Value >= 24 {
 		skillBindings = append(skillBindings, skill.Blizzard)
 	} else if s.Data.PlayerUnit.Skills[skill.Meteor].Level > 0 {
 		skillBindings = append(skillBindings, skill.Meteor)
@@ -683,12 +679,8 @@ func (s SorceressLeveling) SkillsToBind() (skill.ID, []skill.ID) {
 	}
 
 	mainSkill := skill.AttackSkill
-	if s.Data.PlayerUnit.Skills[skill.Blizzard].Level > 0 {
-		mainSkill = skill.Blizzard
-	} else if s.Data.PlayerUnit.Skills[skill.Meteor].Level > 0 {
-		mainSkill = skill.Meteor
-	} else if s.Data.PlayerUnit.Skills[skill.FireBall].Level > 0 {
-		mainSkill = skill.FireBall
+	if level.Value >= 24 {
+		mainSkill = skill.GlacialSpike
 	}
 
 	_, found := s.Data.Inventory.Find(item.TomeOfTownPortal, item.LocationInventory)
