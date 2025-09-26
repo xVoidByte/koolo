@@ -211,10 +211,18 @@ func MoveTo(dest data.Position, options ...MoveOption) error {
 					// Already destroyed, move on
 					continue
 				}
+				ctx.Logger.Debug("Immediate obstacle detected, attempting to interact.", slog.String("object", obj.Desc().Name))
 
-				ctx.Logger.Debug("Immediate obstacle detected, attempting to interact.", slog.String("object", string(obj.Name)))
-				x, y := ui.GameCoordsToScreenCords(obj.Position.X, obj.Position.Y)
-				ctx.HID.Click(game.LeftButton, x, y)
+				if obj.IsDoor() {
+					InteractObject(*obj, func() bool {
+						door, found := ctx.Data.Objects.FindByID(obj.ID)
+						return found && !door.Selectable
+					})
+				} else {
+					x, y := ui.GameCoordsToScreenCords(obj.Position.X, obj.Position.Y)
+					ctx.HID.Click(game.LeftButton, x, y)
+				}
+
 				time.Sleep(time.Millisecond * 50)
 				continue
 			}
