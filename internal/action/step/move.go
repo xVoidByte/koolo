@@ -177,33 +177,6 @@ func MoveTo(dest data.Position, options ...MoveOption) error {
 			}
 		}
 
-		if currentDistanceToDest < minDistanceToFinishMoving {
-			if shrineDestination != (data.Position{}) && shrineDestination == currentDest {
-				shrineFound := false
-				var shrineObject data.Object
-				for _, o := range ctx.Data.Objects {
-					if o.Position == shrineDestination {
-						shrineObject = o
-						shrineFound = true
-						break
-					}
-				}
-
-				if shrineFound {
-					if err := interactWithShrine(&shrineObject); err != nil {
-						ctx.Logger.Warn("Failed to interact with shrine", slog.Any("error", err))
-					}
-				}
-
-				shrineDestination = data.Position{}
-				continue
-			}
-
-			if currentDest == dest {
-				return nil
-			}
-		}
-
 		if !ctx.Data.CanTeleport() {
 			// Handle immediate obstacles in the vicinity first
 			if obj, found := handleImmediateObstacles(); found {
@@ -263,6 +236,33 @@ func MoveTo(dest data.Position, options ...MoveOption) error {
 
 			if monsterFound {
 				return ErrMonstersInPath
+			}
+		}
+
+		if currentDistanceToDest < minDistanceToFinishMoving {
+			if shrineDestination != (data.Position{}) && shrineDestination == currentDest {
+				shrineFound := false
+				var shrineObject data.Object
+				for _, o := range ctx.Data.Objects {
+					if o.Position == shrineDestination {
+						shrineObject = o
+						shrineFound = true
+						break
+					}
+				}
+
+				if shrineFound {
+					if err := interactWithShrine(&shrineObject); err != nil {
+						ctx.Logger.Warn("Failed to interact with shrine", slog.Any("error", err))
+					}
+				}
+
+				shrineDestination = data.Position{}
+				continue
+			}
+
+			if currentDest == dest {
+				return nil
 			}
 		}
 
