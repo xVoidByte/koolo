@@ -57,7 +57,7 @@ func (a Leveling) act4() error {
 
 	lvl, _ := a.ctx.Data.PlayerUnit.FindStat(stat.Level, 0)
 	_, found := a.ctx.Data.Objects.FindOne(object.LastLastPortal)
-	if !found && a.ctx.Data.Quests[quest.Act4TerrorsEnd].Completed() && (lvl.Value >= 60 && a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && effectiveFireRes >= 75 && effectiveLightRes >= 50) || (lvl.Value >= 33 && a.ctx.CharacterCfg.Game.Difficulty == difficulty.Normal) {
+	if !found && a.ctx.Data.Quests[quest.Act4TerrorsEnd].Completed() && ((lvl.Value >= 60 && a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && effectiveFireRes >= 75 && effectiveLightRes >= 50) || (lvl.Value >= 33 && a.ctx.CharacterCfg.Game.Difficulty == difficulty.Normal)) {
 		err := action.InteractNPC(npc.Tyrael2)
 		if err != nil {
 			return err // It's good practice to handle errors
