@@ -127,7 +127,7 @@ func (a Leveling) act4() error {
 		}
 	}
 
-	if (a.ctx.Data.Quests[quest.Act4TheFallenAngel].Completed() && !a.ctx.Data.Quests[quest.Act4TerrorsEnd].Completed()) || (a.ctx.Data.Quests[quest.Act4TerrorsEnd].Completed() && a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && (lvl.Value < 60 || effectiveFireRes < 75 || effectiveLightRes < 50)) || (a.ctx.Data.Quests[quest.Act4TerrorsEnd].Completed() && a.ctx.CharacterCfg.Game.Difficulty == difficulty.Normal && lvl.Value < 33) {
+	if !found && a.ctx.Data.Quests[quest.Act4TerrorsEnd].Completed() && ((lvl.Value >= 60 && a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && effectiveFireRes >= 75 && effectiveLightRes >= 50) || (lvl.Value >= 33 && a.ctx.CharacterCfg.Game.Difficulty == difficulty.Normal)) {
 		diabloRun := NewDiablo()
 		err := diabloRun.Run()
 		if err != nil {
