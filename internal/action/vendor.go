@@ -31,6 +31,13 @@ func VendorRefill(forceRefill bool, sellJunk bool, tempLock ...[][]int) (err err
 			vendorNPC = npc.Lysander
 		}
 	}
+	if vendorNPC == npc.Ormus {
+		_, needsBuy := town.ShouldBuyKeys()
+		if needsBuy && ctx.Data.PlayerUnit.Class != data.Assassin {
+			vendorNPC = npc.Hratli
+		}
+	}
+
 	err = InteractNPC(vendorNPC)
 	if err != nil {
 		return err
