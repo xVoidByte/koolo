@@ -309,7 +309,7 @@ func BuyItem(i data.Item, quantity int) {
 	time.Sleep(250 * time.Millisecond)
 	for k := 0; k < quantity; k++ {
 		ctx.HID.Click(game.RightButton, screenPos.X, screenPos.Y)
-		time.Sleep(900 * time.Millisecond)
+		time.Sleep(600 * time.Millisecond)
 		ctx.Logger.Debug(fmt.Sprintf("Purchased %s [X:%d Y:%d]", i.Desc().Name, i.Position.X, i.Position.Y))
 	}
 }
@@ -327,7 +327,7 @@ func buyFullStack(i data.Item, currentKeysInInventory int) {
 	// - If 0 keys: this buys 1 key.
 	// - If >0 keys: this fills the current stack.
 	ctx.HID.ClickWithModifier(game.RightButton, screenPos.X, screenPos.Y, game.ShiftKey)
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
 	// Special handling for keys: only perform a second click if starting from 0 keys.
 	if i.Name == item.Key {
@@ -335,7 +335,7 @@ func buyFullStack(i data.Item, currentKeysInInventory int) {
 			// As per user: if 0 keys, first click buys 1, second click fills the stack.
 			ctx.Logger.Debug("Initial keys were 0. Performing second Shift+Right Click to fill key stack.")
 			ctx.HID.ClickWithModifier(game.RightButton, screenPos.X, screenPos.Y, game.ShiftKey)
-			time.Sleep(500 * time.Millisecond) // Add another delay for the second click
+			time.Sleep(200 * time.Millisecond) // Add another delay for the second click
 		} else {
 			// As per user: if > 0 keys, the first click should have already filled the stack.
 			// No second click is needed to avoid buying an unnecessary extra key/stack.
@@ -410,3 +410,4 @@ func ItemsToBeSold(lockConfig ...[][]int) (items []data.Item) {
 
 	return
 }
+

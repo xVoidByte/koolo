@@ -175,7 +175,7 @@ func MoveToArea(dst area.ID) error {
 
 	var err error
 
-	if dst == area.HaremLevel1 && ctx.Data.PlayerUnit.Area == area.LutGholein || dst == area.SewersLevel3Act2 && ctx.Data.PlayerUnit.Area == area.SewersLevel2Act2 {
+	if dst == area.HaremLevel1 && ctx.Data.PlayerUnit.Area == area.LutGholein || dst == area.SewersLevel3Act2 && ctx.Data.PlayerUnit.Area == area.SewersLevel2Act2 || dst == area.TowerCellarLevel1 && ctx.Data.PlayerUnit.Area == area.ForgottenTower || dst == area.TowerCellarLevel2 && ctx.Data.PlayerUnit.Area == area.TowerCellarLevel1 || dst == area.TowerCellarLevel3 && ctx.Data.PlayerUnit.Area == area.TowerCellarLevel2 || dst == area.TowerCellarLevel4 && ctx.Data.PlayerUnit.Area == area.TowerCellarLevel3 || dst == area.TowerCellarLevel5 && ctx.Data.PlayerUnit.Area == area.TowerCellarLevel4 {
 		// Because of the size of the entrance we need to stop a bit before to avoid infinite
 		// walking loop otherwise it'll never reach the exact position.
 		entrancePosition, _ := toFun()
