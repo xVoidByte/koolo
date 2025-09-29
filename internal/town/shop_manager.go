@@ -309,7 +309,7 @@ func BuyItem(i data.Item, quantity int) {
 	time.Sleep(250 * time.Millisecond)
 	for k := 0; k < quantity; k++ {
 		ctx.HID.Click(game.RightButton, screenPos.X, screenPos.Y)
-		time.Sleep(400 * time.Millisecond)
+		time.Sleep(600 * time.Millisecond)
 		ctx.Logger.Debug(fmt.Sprintf("Purchased %s [X:%d Y:%d]", i.Desc().Name, i.Position.X, i.Position.Y))
 	}
 }
@@ -410,3 +410,4 @@ func ItemsToBeSold(lockConfig ...[][]int) (items []data.Item) {
 
 	return
 }
+
