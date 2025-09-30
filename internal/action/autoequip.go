@@ -81,8 +81,8 @@ func AutoEquip() error {
 				playerEvalItems = append(playerEvalItems, itm)
 			}
 		}
-		playerItems := evaluateItems(playerEvalItems, item.LocationEquipped, PlayerScore)
-		playerChanged, err := equipBestItems(playerItems, item.LocationEquipped)
+		playerItems, playerScores := evaluateItems(playerEvalItems, item.LocationEquipped, PlayerScore)
+		playerChanged, err := equipBestItems(playerItems, playerScores, item.LocationEquipped)
 		if err != nil {
 			ctx.Logger.Error(fmt.Sprintf("Player equip error: %v. Continuing...", err))
 		}
@@ -105,8 +105,8 @@ func AutoEquip() error {
 			}
 
 			// Use this new filtered list for the mercenary evaluation.
-			mercItems := evaluateItems(mercEvalItems, item.LocationMercenary, MercScore)
-			mercChanged, err = equipBestItems(mercItems, item.LocationMercenary)
+			mercItems, mercScores := evaluateItems(mercEvalItems, item.LocationMercenary, MercScore)
+			mercChanged, err = equipBestItems(mercItems, mercScores, item.LocationMercenary) // Pass mercScores
 			if err != nil {
 				ctx.Logger.Error(fmt.Sprintf("Mercenary equip error: %v. Continuing...", err))
 			}
@@ -366,7 +366,7 @@ func isAct2MercenaryPresent(mercName npc.ID) bool {
 }
 
 // evaluateItems processes items for either player or merc
-func evaluateItems(items []data.Item, target item.LocationType, scoreFunc func(data.Item) map[item.LocationType]float64) map[item.LocationType][]data.Item {
+func evaluateItems(items []data.Item, target item.LocationType, scoreFunc func(data.Item) map[item.LocationType]float64) (map[item.LocationType][]data.Item, map[data.UnitID]map[item.LocationType]float64) {
 	ctx := context.Get()
 	itemsByLoc := make(map[item.LocationType][]data.Item)
 	itemScores := make(map[data.UnitID]map[item.LocationType]float64)
@@ -458,11 +458,11 @@ func evaluateItems(items []data.Item, target item.LocationType, scoreFunc func(d
 		}
 	}
 
-	return itemsByLoc
+	return itemsByLoc, itemScores
 }
 
 // equipBestItems tries to equip the best items, returns true if any item was changed
-func equipBestItems(itemsByLoc map[item.LocationType][]data.Item, target item.LocationType) (bool, error) {
+func equipBestItems(itemsByLoc map[item.LocationType][]data.Item, itemScores map[data.UnitID]map[item.LocationType]float64, target item.LocationType) (bool, error) {
 	ctx := context.Get()
 	equippedSomething := false
 
@@ -494,6 +494,18 @@ func equipBestItems(itemsByLoc map[item.LocationType][]data.Item, target item.Lo
 
 		if currentlyEquipped.UnitID != 0 && bestCandidate.UnitID == currentlyEquipped.UnitID {
 			continue // Already equipped the best item
+		}
+
+		if currentlyEquipped.UnitID != 0 {
+			oldScore := itemScores[currentlyEquipped.UnitID][loc]
+			newScore := itemScores[bestCandidate.UnitID][loc]
+
+			// If the new item is NOT strictly better, we skip the equip.
+			if newScore <= oldScore {
+				ctx.Logger.Debug(fmt.Sprintf("Skipping equip of %s to %s: Candidate score (%.2f) is not strictly better than equipped item score (%.2f).",
+					bestCandidate.IdentifiedName, loc, newScore, oldScore))
+				continue
+			}
 		}
 
 		// Attempting to equip the best item
