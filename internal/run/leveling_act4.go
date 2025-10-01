@@ -93,11 +93,11 @@ func (a Leveling) act4() error {
 
 		NewLowerKurastChest().Run()
 		NewMephisto(nil).Run()
-		/*NewMausoleum().Run()
+		NewMausoleum().Run()
 		err := action.WayPoint(area.ThePandemoniumFortress)
 		if err != nil {
 			return err
-		}*/
+		}
 
 		return nil
 	}
@@ -225,3 +225,4 @@ func (a Leveling) OuterSteppes() error {
 
 	return nil
 }
+
