@@ -175,11 +175,45 @@ func MoveToArea(dst area.ID) error {
 
 	var err error
 
-	if dst == area.HaremLevel1 && ctx.Data.PlayerUnit.Area == area.LutGholein || dst == area.SewersLevel3Act2 && ctx.Data.PlayerUnit.Area == area.SewersLevel2Act2 || dst == area.TowerCellarLevel1 && ctx.Data.PlayerUnit.Area == area.ForgottenTower || dst == area.TowerCellarLevel2 && ctx.Data.PlayerUnit.Area == area.TowerCellarLevel1 || dst == area.TowerCellarLevel3 && ctx.Data.PlayerUnit.Area == area.TowerCellarLevel2 || dst == area.TowerCellarLevel4 && ctx.Data.PlayerUnit.Area == area.TowerCellarLevel3 || dst == area.TowerCellarLevel5 && ctx.Data.PlayerUnit.Area == area.TowerCellarLevel4 {
-		// Because of the size of the entrance we need to stop a bit before to avoid infinite
-		// walking loop otherwise it'll never reach the exact position.
+	// Areas that require a distance override for proper entrance interaction (Tower, Harem, Sewers)
+	if dst == area.HaremLevel1 && ctx.Data.PlayerUnit.Area == area.LutGholein ||
+		dst == area.SewersLevel3Act2 && ctx.Data.PlayerUnit.Area == area.SewersLevel2Act2 ||
+		dst == area.TowerCellarLevel1 && ctx.Data.PlayerUnit.Area == area.ForgottenTower ||
+		dst == area.TowerCellarLevel2 && ctx.Data.PlayerUnit.Area == area.TowerCellarLevel1 ||
+		dst == area.TowerCellarLevel3 && ctx.Data.PlayerUnit.Area == area.TowerCellarLevel2 ||
+		dst == area.TowerCellarLevel4 && ctx.Data.PlayerUnit.Area == area.TowerCellarLevel3 ||
+		dst == area.TowerCellarLevel5 && ctx.Data.PlayerUnit.Area == area.TowerCellarLevel4 {
+
+		// Use a custom loop to integrate the distance override with monster handling.
 		entrancePosition, _ := toFun()
-		err = step.MoveTo(entrancePosition, step.WithDistanceToFinish(7))
+
+		for {
+			moveErr := step.MoveTo(entrancePosition, step.WithDistanceToFinish(7))
+
+			if moveErr != nil {
+				if errors.Is(moveErr, step.ErrMonstersInPath) {
+					// RE-INTRODUCING COMBAT LOGIC FROM MoveTo(toFun)
+					clearPathDist := ctx.CharacterCfg.Character.ClearPathDist
+					ctx.Logger.Debug("Monster detected while using distance override. Engaging.")
+
+					if time.Since(actionLastMonsterHandlingTime) > monsterHandleCooldown {
+						actionLastMonsterHandlingTime = time.Now()
+						_ = ClearAreaAroundPosition(ctx.Data.PlayerUnit.Position, clearPathDist, data.MonsterAnyFilter())
+
+						lootErr := ItemPickup(lootAfterCombatRadius)
+						if lootErr != nil {
+							ctx.Logger.Warn("Error picking up items after combat (Tower/Harem/Sewers)", slog.String("error", lootErr.Error()))
+						}
+					}
+					continue
+				}
+				// Handle other errors (like pathfinding failure or death)
+				err = moveErr
+				break
+			}
+			err = nil
+			break
+		}
 	} else {
 		err = MoveTo(toFun)
 	}
