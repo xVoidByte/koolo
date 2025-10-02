@@ -55,6 +55,19 @@ func (a Leveling) act1() error {
 		return NewMausoleum().Run()
 	}
 
+	// in case we're farming already, directly skip to a4 (we end up in a1 if we die while farming mausoleum)
+	if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Hell && lvl.Value >= 80 && a.ctx.Data.Quests[quest.Act1SistersToTheSlaughter].Completed() {
+
+		a.ctx.Logger.Info("Attempting to reach Act 4 via The Pandemonium Fortress waypoint.")
+		err := action.WayPoint(area.ThePandemoniumFortress)
+		if err == nil {
+			a.ctx.Logger.Info("Successfully reached Act 4 via waypoint. Ending Act 3 script.")
+			return nil
+		} else {
+			a.ctx.Logger.Info("Could not use waypoint to The Pandemonium Fortress. Falling back to manual portal entry.")
+		}
+	}
+
 	// Farming for low gold
 	if a.ctx.Data.PlayerUnit.TotalPlayerGold() < 50000 {
 		if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare {

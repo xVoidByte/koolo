@@ -14,6 +14,7 @@ import (
 	"github.com/hectorgimenez/d2go/pkg/data/quest"
 	"github.com/hectorgimenez/d2go/pkg/data/stat"
 	"github.com/hectorgimenez/koolo/internal/action"
+	"github.com/hectorgimenez/koolo/internal/config"
 	"github.com/hectorgimenez/koolo/internal/utils"
 	"github.com/lxn/win"
 )
@@ -87,21 +88,6 @@ func (a Leveling) act4() error {
 		return nil
 	}
 
-	if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Hell && lvl.Value < 90 {
-
-		a.ctx.Logger.Info("Under level 90 we assume we must still farm items")
-
-		NewLowerKurastChest().Run()
-		NewMephisto(nil).Run()
-		NewMausoleum().Run()
-		err := action.WayPoint(area.ThePandemoniumFortress)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}
-
 	if (a.ctx.CharacterCfg.Game.Difficulty == difficulty.Normal && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 30000) ||
 		(a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 50000) ||
 		(a.ctx.CharacterCfg.Game.Difficulty == difficulty.Hell && a.ctx.Data.PlayerUnit.TotalPlayerGold() < 70000) {
@@ -110,6 +96,30 @@ func (a Leveling) act4() error {
 
 		NewLowerKurastChest().Run()
 
+		err := action.WayPoint(area.ThePandemoniumFortress)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Hell && lvl.Value < 90 {
+
+		//Deactivate shrine interaction for late leveling phase (with low gear in hell searching for shrines leads to more problems than benefits)
+		if a.ctx.CharacterCfg.Game.InteractWithShrines {
+			a.ctx.CharacterCfg.Game.InteractWithShrines = false
+
+			if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
+				a.ctx.Logger.Error(fmt.Sprintf("Failed to save character configuration: %s", err.Error()))
+			}
+		}
+
+		a.ctx.Logger.Info("Under level 90 we assume we must still farm items")
+
+		NewLowerKurastChest().Run()
+		NewMephisto(nil).Run()
+		NewMausoleum().Run()
 		err := action.WayPoint(area.ThePandemoniumFortress)
 		if err != nil {
 			return err
@@ -225,4 +235,3 @@ func (a Leveling) OuterSteppes() error {
 
 	return nil
 }
-
