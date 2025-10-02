@@ -76,12 +76,9 @@ func (a Leveling) act1() error {
 		if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Hell {
 
 			if a.ctx.Data.PlayerUnit.TotalPlayerGold() < 5000 {
-
+				//set clearpathdistance high in eco run (also for sorc as we must assume, she may not be allowed to tele)
 				a.ctx.CharacterCfg.Character.ClearPathDist = 20
 
-				if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
-					a.ctx.Logger.Error(fmt.Sprintf("Failed to save character configuration: %s", err.Error()))
-				}
 			}
 
 			return NewMausoleum().Run()
@@ -302,7 +299,13 @@ func (a Leveling) AdjustDifficultyConfig() {
 			a.ctx.CharacterCfg.Health.MercRejuvPotionAt = 40
 			a.ctx.CharacterCfg.Health.HealingPotionAt = 90
 			a.ctx.CharacterCfg.Health.ChickenAt = 40
-			a.ctx.CharacterCfg.Character.ClearPathDist = 15
+			if a.ctx.CharacterCfg.Character.Class == "sorceress_leveling" {
+				// don't engage when teleing and running oom
+				a.ctx.CharacterCfg.Character.ClearPathDist = 0
+				} else {
+				a.ctx.CharacterCfg.Character.ClearPathDist = 15
+				}
+
 
 		}
 		if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
@@ -528,3 +531,4 @@ func (a Leveling) shouldFarmCountessForRunes() bool {
 	a.ctx.Logger.Info("All required runes are present. Skipping Countess farm.")
 	return false
 }
+
