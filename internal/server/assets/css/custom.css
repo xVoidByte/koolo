@@ -373,3 +373,9 @@
     background-color: var(--pico-background-color);
     margin-bottom: 0;
 }
+
+.non-ladder-checkbox-container {
+    display: flex;
+    align-items: center;
+    padding-top: 12px;
+}
