@@ -138,6 +138,7 @@ type CharacterCfg struct {
 		UseCainIdentify        bool                  `yaml:"useCainIdentify"`
 		InteractWithShrines    bool                  `yaml:"interactWithShrines"`
 		StopLevelingAt         int                   `yaml:"stopLevelingAt"`
+		IsNonLadderChar        bool                  `yaml:"isNonLadderChar"`
 		ClearTPArea            bool                  `yaml:"clearTPArea"`
 		Difficulty             difficulty.Difficulty `yaml:"difficulty"`
 		RandomizeRuns          bool                  `yaml:"randomizeRuns"`

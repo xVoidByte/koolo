@@ -198,7 +198,12 @@ func (a Leveling) act1() error {
 
 // setupLevelOneConfig centralizes the configuration logic for a new character.
 func (a Leveling) setupLevelOneConfig() {
-	enabledRunewordRecipes := []string{"Stealth", "Ancients' Pledge", "Lore", "Insight", "Spirit", "Smoke", "Treachery", "Heart of the Oak", "Call to Arms", "Bulwark", "Hustle"}
+	enabledRunewordRecipes := []string{"Stealth", "Ancients' Pledge", "Lore", "Insight", "Spirit", "Smoke", "Treachery", "Heart of the Oak", "Call to Arms"}
+
+	if !a.ctx.CharacterCfg.Game.IsNonLadderChar {
+		enabledRunewordRecipes = append(enabledRunewordRecipes, "Bulwark", "Hustle")
+		a.ctx.Logger.Info("Ladder character detected. Adding Bulwark and Hustle runewords.")
+	}
 
 	if a.ctx.CharacterCfg.Character.Class == "paladin" {
 		enabledRunewordRecipes = append(enabledRunewordRecipes, "Steel")

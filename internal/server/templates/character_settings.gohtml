@@ -88,6 +88,10 @@
                     <input name="characterName" placeholder="{{ .Config.CharacterName }}"
                            value="{{ .Config.CharacterName }}"/>
                 </label>
+                <label class="non-ladder-checkbox-container">
+                    <input type="checkbox" name="isNonLadderChar" {{ if .Config.Game.IsNonLadderChar }}checked{{ end }}/>
+                    Non-Ladder
+                </label>
             </fieldset>
 
             <h5>Class-Specific Settings</h5>
