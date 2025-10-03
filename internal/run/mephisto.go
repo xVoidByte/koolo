@@ -7,6 +7,7 @@ import (
 	"github.com/hectorgimenez/d2go/pkg/data/area"
 	"github.com/hectorgimenez/d2go/pkg/data/npc"
 	"github.com/hectorgimenez/d2go/pkg/data/object"
+	"github.com/hectorgimenez/d2go/pkg/data/stat"
 	"github.com/hectorgimenez/koolo/internal/action"
 	"github.com/hectorgimenez/koolo/internal/config"
 	"github.com/hectorgimenez/koolo/internal/context"
@@ -63,8 +64,10 @@ func (m Mephisto) Run() error {
 		return err
 	}
 
+	lvl, _ := m.ctx.Data.PlayerUnit.FindStat(stat.Level, 0)
+
 	_, isLevelingChar := m.ctx.Char.(context.LevelingCharacter)
-	if isLevelingChar {
+	if isLevelingChar && lvl.Value < 80 {
 
 		action.ReturnTown()
 		action.IdentifyAll(false)

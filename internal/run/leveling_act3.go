@@ -67,7 +67,6 @@ func (a Leveling) act3() error {
 			return nil
 		} else {
 			a.ctx.Logger.Info("Could not use waypoint to The Pandemonium Fortress. Falling back to manual portal entry.")
-			// The rest of the original code follows here
 		}
 
 		// Use waypoint to DuranceOfHateLevel2

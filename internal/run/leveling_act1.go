@@ -55,6 +55,19 @@ func (a Leveling) act1() error {
 		return NewMausoleum().Run()
 	}
 
+	// in case we're farming already, directly skip to a4 (we end up in a1 if we die while farming mausoleum)
+	if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Hell && lvl.Value >= 80 && a.ctx.Data.Quests[quest.Act1SistersToTheSlaughter].Completed() {
+
+		a.ctx.Logger.Info("Attempting to reach Act 4 via The Pandemonium Fortress waypoint.")
+		err := action.WayPoint(area.ThePandemoniumFortress)
+		if err == nil {
+			a.ctx.Logger.Info("Successfully reached Act 4 via waypoint. Ending Act 3 script.")
+			return nil
+		} else {
+			a.ctx.Logger.Info("Could not use waypoint to The Pandemonium Fortress. Falling back to manual portal entry.")
+		}
+	}
+
 	// Farming for low gold
 	if a.ctx.Data.PlayerUnit.TotalPlayerGold() < 50000 {
 		if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Nightmare {
@@ -63,12 +76,9 @@ func (a Leveling) act1() error {
 		if a.ctx.CharacterCfg.Game.Difficulty == difficulty.Hell {
 
 			if a.ctx.Data.PlayerUnit.TotalPlayerGold() < 5000 {
-
+				//set clearpathdistance high in eco run (also for sorc as we must assume, she may not be allowed to tele)
 				a.ctx.CharacterCfg.Character.ClearPathDist = 20
 
-				if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
-					a.ctx.Logger.Error(fmt.Sprintf("Failed to save character configuration: %s", err.Error()))
-				}
 			}
 
 			return NewMausoleum().Run()
@@ -289,7 +299,13 @@ func (a Leveling) AdjustDifficultyConfig() {
 			a.ctx.CharacterCfg.Health.MercRejuvPotionAt = 40
 			a.ctx.CharacterCfg.Health.HealingPotionAt = 90
 			a.ctx.CharacterCfg.Health.ChickenAt = 40
-			a.ctx.CharacterCfg.Character.ClearPathDist = 15
+			if a.ctx.CharacterCfg.Character.Class == "sorceress_leveling" {
+				// don't engage when teleing and running oom
+				a.ctx.CharacterCfg.Character.ClearPathDist = 0
+				} else {
+				a.ctx.CharacterCfg.Character.ClearPathDist = 15
+				}
+
 
 		}
 		if err := config.SaveSupervisorConfig(a.ctx.CharacterCfg.ConfigFolderName, a.ctx.CharacterCfg); err != nil {
@@ -515,3 +531,4 @@ func (a Leveling) shouldFarmCountessForRunes() bool {
 	a.ctx.Logger.Info("All required runes are present. Skipping Countess farm.")
 	return false
 }
+
