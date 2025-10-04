@@ -127,13 +127,15 @@ func clearRoom(room data.Room, filter data.MonsterFilter) error {
 			}
 		}
 
-		path, _, mPathFound := ctx.PathFinder.GetPath(targetMonster.Position)
+		_, _, mPathFound := ctx.PathFinder.GetPath(targetMonster.Position)
 		if mPathFound {
 			if !ctx.Data.CanTeleport() {
 				for _, o := range ctx.Data.Objects {
-					if o.IsDoor() && o.Selectable && path.Intersects(*ctx.Data, o.Position, 4) {
+					if ctx.PathFinder.HasDoorBetween(ctx.Data.PlayerUnit.Position, targetMonster.Position) {
 						ctx.Logger.Debug("Door is blocking the path to the monster, moving closer")
-						MoveToCoords(targetMonster.Position)
+						MoveTo(func() (data.Position, bool) {
+							return o.Position, true
+						})
 					}
 				}
 			}
