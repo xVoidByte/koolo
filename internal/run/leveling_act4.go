@@ -44,7 +44,7 @@ func (a Leveling) act4() error {
 
 	action.UpdateQuestLog()
 
-	action.VendorRefill(true, true)
+	action.VendorRefill(false, true)
 
 	rawFireRes, _ := a.ctx.Data.PlayerUnit.FindStat(stat.FireResist, 0)
 	rawLightRes, _ := a.ctx.Data.PlayerUnit.FindStat(stat.LightningResist, 0)
