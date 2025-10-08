@@ -532,7 +532,7 @@ func (s *HttpServer) getStatusData() IndexData {
 			if cfg.Companion.Enabled && !cfg.Companion.Leader {
 				// This is a companion follower
 				stats.IsCompanionFollower = true
-				stats.MuleEnabled = cfg.Muling.Enabled
+				//stats.MuleEnabled = cfg.Muling.Enabled
 			}
 		}
 
@@ -576,7 +576,7 @@ func (s *HttpServer) Listen(port int) error {
 	http.HandleFunc("/initial-data", s.initialData)         // Web socket data
 	http.HandleFunc("/api/reload-config", s.reloadConfig)   // New handler
 	http.HandleFunc("/api/companion-join", s.companionJoin) // Companion join handler
-	http.HandleFunc("/reset-muling", s.resetMuling)
+	//http.HandleFunc("/reset-muling", s.resetMuling)
 
 	assets, _ := fs.Sub(assetsFS, "assets")
 	http.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.FS(assets))))
@@ -1303,9 +1303,9 @@ func (s *HttpServer) characterSettings(w http.ResponseWriter, r *http.Request) {
 		cfg.BackToTown.EquipmentBroken = r.Form.Has("equipmentBroken")
 
 		// Muling
-		cfg.Muling.Enabled = r.FormValue("mulingEnabled") == "on"
-		cfg.Muling.MuleProfiles = r.Form["mulingMuleProfiles[]"]
-		cfg.Muling.ReturnTo = r.FormValue("mulingReturnTo")
+		//cfg.Muling.Enabled = r.FormValue("mulingEnabled") == "on"
+		//cfg.Muling.MuleProfiles = r.Form["mulingMuleProfiles[]"]
+		//cfg.Muling.ReturnTo = r.FormValue("mulingReturnTo")
 
 		config.SaveSupervisorConfig(supervisorName, cfg)
 		http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -1419,7 +1419,7 @@ func (s *HttpServer) resetMuling(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.logger.Info("Resetting muling index for character", "character", characterName)
-	cfg.MulingState.CurrentMuleIndex = 0
+	//cfg.MulingState.CurrentMuleIndex = 0
 
 	err := config.SaveSupervisorConfig(characterName, cfg)
 	if err != nil {
@@ -1488,3 +1488,4 @@ func (s *HttpServer) resetDroplogs(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"status": "ok", "dir": dir, "removed": removed})
 }
+
