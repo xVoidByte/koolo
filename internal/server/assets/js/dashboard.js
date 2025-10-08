@@ -130,7 +130,7 @@ function createCharacterCard(key) {
                 </div>
                 <div class="co-line">
                     <span class="co-life">Life: -</span>
-                    <span class="co-sep"> / </span>
+                    <span class="co-dot"> • </span>
                     <span class="co-mana">Mana: -</span>
                     <span class="co-dot"> • </span>
                     <span class="co-mf">MF: -</span>
