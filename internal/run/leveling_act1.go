@@ -209,6 +209,14 @@ func (a Leveling) setupLevelOneConfig() {
 		enabledRunewordRecipes = append(enabledRunewordRecipes, "Steel")
 	}
 
+	if a.ctx.CharacterCfg.Character.Class == "sorceress_leveling" {
+		a.ctx.CharacterCfg.Character.ClearPathDist = 7
+		a.ctx.CharacterCfg.Character.SorceressLeveling.UseMoatTrick = true
+		a.ctx.CharacterCfg.Character.SorceressLeveling.UseStaticOnMephisto = false
+	} else {
+		a.ctx.CharacterCfg.Character.ClearPathDist = 15
+	}
+
 	a.ctx.CharacterCfg.Game.Difficulty = difficulty.Normal
 	a.ctx.CharacterCfg.Game.Leveling.EnsurePointsAllocation = true
 	a.ctx.CharacterCfg.Game.Leveling.EnsureKeyBinding = true
@@ -224,13 +232,6 @@ func (a Leveling) setupLevelOneConfig() {
 	a.ctx.CharacterCfg.Health.RejuvPotionAtLife = 0
 	a.ctx.CharacterCfg.Health.ChickenAt = 7
 	a.ctx.CharacterCfg.Gambling.Enabled = true
-
-	if a.ctx.CharacterCfg.Character.Class == "sorceress_leveling" {
-		a.ctx.CharacterCfg.Character.ClearPathDist = 7
-	} else {
-		a.ctx.CharacterCfg.Character.ClearPathDist = 15
-	}
-
 	a.ctx.CharacterCfg.Health.MercRejuvPotionAt = 40
 	a.ctx.CharacterCfg.Health.MercChickenAt = 0
 	a.ctx.CharacterCfg.Health.MercHealingPotionAt = 25
