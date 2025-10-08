@@ -212,7 +212,7 @@ func (a Leveling) setupLevelOneConfig() {
 	if a.ctx.CharacterCfg.Character.Class == "sorceress_leveling" {
 		a.ctx.CharacterCfg.Character.ClearPathDist = 7
 		a.ctx.CharacterCfg.Character.SorceressLeveling.UseMoatTrick = true
-		a.ctx.CharacterCfg.Character.SorceressLeveling.UseStaticOnMephisto = false
+		a.ctx.CharacterCfg.Character.SorceressLeveling.UseStaticOnMephisto = true
 	} else {
 		a.ctx.CharacterCfg.Character.ClearPathDist = 15
 	}
