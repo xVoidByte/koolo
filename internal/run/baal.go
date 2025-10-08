@@ -164,7 +164,7 @@ func (s Baal) checkForSoulsOrDolls() bool {
 
 func (s *Baal) preAttackBaalWaves() {
 	// Positions adapted from kolbot baal.js preattack
-	blizzPos := data.Position{X: 15093, Y: 5024}
+	blizzPos := data.Position{X: 15094, Y: 5027}
 	hammerPos := data.Position{X: 15094, Y: 5029}
 	throneCenter := data.Position{X: 15093, Y: 5029}
 	forwardPos := data.Position{X: 15116, Y: 5026}
