@@ -52,11 +52,11 @@ type SorceressLeveling struct {
 
 // fireSkillSequence defines the skill allocation for levels < 32
 var fireSkillSequence = []skill.ID{
-	skill.FireBolt,    // Lvl 2 (1st point)
+	skill.FrozenArmor, // Lvl 2 (1st point)
 	skill.FireBolt,    // Lvl 2 (+1 from Den of Evil, 2nd point)
 	skill.FireBolt,    // Lvl 3 (3rd point)
 	skill.FireBolt,    // Lvl 4 (4th point)
-	skill.FrozenArmor, // Lvl 5 (1st point)
+	skill.FireBolt,    // Lvl 5 (1st point)
 	skill.FireBolt,    // Lvl 6 (1st point)
 	skill.FireBolt,    // Lvl 7 (1st point)
 	skill.FireBolt,    // Lvl 8 (5th point)
@@ -65,7 +65,7 @@ var fireSkillSequence = []skill.ID{
 	skill.FireBolt,    // Lvl 11 (8th point)
 	skill.FireBall,    // Lvl 12 (9th point)
 	skill.FireBall,    // Lvl 13 (1st point)
-	skill.FireBolt,    // Lvl 13 (At this point we should have rada so we need to spend another point but can't spend into Fireball because of lvl restrictions)
+	skill.FireBall,    // Lvl 13 (At this point we should have rada so we need to spend another point but can't spend into Fireball because of lvl restrictions)
 	skill.FireBall,    // Lvl 14 (2nd point)
 	skill.FireBall,    // Lvl 15 (3rd point)
 	skill.FireBall,    // Lvl 16 (4th point)
@@ -646,7 +646,7 @@ func (s SorceressLeveling) SkillsToBind() (skill.ID, []skill.ID) {
 		skill.FireBolt,
 	}
 
-	if level.Value >= 4 {
+	if level.Value >= 2 {
 		skillBindings = append(skillBindings, skill.FrozenArmor)
 	}
 	if level.Value >= 6 {
