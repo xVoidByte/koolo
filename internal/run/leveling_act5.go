@@ -254,11 +254,11 @@ func (a Leveling) act5() error {
 		NewMephisto(nil).Run()
 		NewMausoleum().Run()
 		diabloRun := NewDiablo()
-		err = diabloRun.Run()
+		err := diabloRun.Run()
 		if err != nil {
 			return err
 		}
-		err := action.WayPoint(area.Harrogath)
+		err = action.WayPoint(area.Harrogath)
 		if err != nil {
 			return err
 		}
@@ -294,4 +294,5 @@ func (a Leveling) CrystallinePassage() error {
 	return nil
 
 }
+
 
