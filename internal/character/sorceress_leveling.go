@@ -65,7 +65,7 @@ var fireSkillSequence = []skill.ID{
 	skill.FireBolt,    // Lvl 11 (8th point)
 	skill.FireBall,    // Lvl 12 (9th point)
 	skill.FireBall,    // Lvl 13 (1st point)
-	skill.FireBall,    // Lvl 13 (At this point we should have rada so we need to spend another point but can't spend into Fireball because of lvl restrictions)
+	skill.FireBolt,    // Lvl 13 (At this point we should have rada so we need to spend another point but can't spend into Fireball because of lvl restrictions)
 	skill.FireBall,    // Lvl 14 (2nd point)
 	skill.FireBall,    // Lvl 15 (3rd point)
 	skill.FireBall,    // Lvl 16 (4th point)
