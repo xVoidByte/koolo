@@ -1141,6 +1141,18 @@ func (s *HttpServer) characterSettings(w http.ResponseWriter, r *http.Request) {
 			cfg.Character.MosaicSin.UseFistsOfFire = r.Form.Has("mosaicUseFistsOfFire")
 		}
 
+		// Blizzard Sorc specific options
+		if cfg.Character.Class == "sorceress" {
+			cfg.Character.BlizzardSorceress.UseMoatTrick = r.Form.Has("useMoatTrick")
+			cfg.Character.BlizzardSorceress.UseStaticOnMephisto = r.Form.Has("useStaticOnMephisto")
+		}
+
+		// Sorceress Leveling specific options
+		if cfg.Character.Class == "sorceress_leveling" {
+			cfg.Character.SorceressLeveling.UseMoatTrick = r.Form.Has("useMoatTrick")
+			cfg.Character.SorceressLeveling.UseStaticOnMephisto = r.Form.Has("useStaticOnMephisto")
+		}
+
 		for y, row := range cfg.Inventory.InventoryLock {
 			for x := range row {
 				if r.Form.Has(fmt.Sprintf("inventoryLock[%d][%d]", y, x)) {
