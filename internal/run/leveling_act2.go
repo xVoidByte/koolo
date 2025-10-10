@@ -207,6 +207,21 @@ func (a Leveling) act2() error {
 
 	}
 
+	if itm, found := a.ctx.Data.Inventory.Find("BookofSkill"); found {
+		a.ctx.Logger.Info("BookofSkill found in inventory. Using it...")
+
+		// Use the book of skill
+		step.CloseAllMenus()
+		a.ctx.HID.PressKeyBinding(a.ctx.Data.KeyBindings.Inventory)
+		screenPos := ui.GetScreenCoordsForItem(itm)
+		utils.Sleep(200)
+		a.ctx.HID.Click(game.RightButton, screenPos.X, screenPos.Y)
+		step.CloseAllMenus()
+
+		a.ctx.Logger.Info("Book of Skill used successfully.")
+
+	}
+
 	if a.ctx.Data.Quests[quest.Act2TheHoradricStaff].HasStatus(quest.StatusInProgress4) {
 		action.InteractNPC(npc.Drognan)
 	}
@@ -653,3 +668,4 @@ func (a Leveling) DurielFilter() data.MonsterFilter {
 		return filteredMonsters
 	}
 }
+
