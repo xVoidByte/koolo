@@ -23,7 +23,7 @@ import (
 )
 
 func (a Leveling) act5() error {
-	if a.ctx.Data.PlayerUnit.Area != area.Harrogath && a.ctx.Data.PlayerUnit.Area != area.FrozenRiver {
+	if a.ctx.Data.PlayerUnit.Area != area.Harrogath {
 		return nil
 	}
 
@@ -259,4 +259,5 @@ func (a Leveling) CrystallinePassage() error {
 	return nil
 
 }
+
 
