@@ -249,18 +249,16 @@ func (a Leveling) act5() error {
 			}
 		}
 
-		a.ctx.Logger.Info("Under level 90 we assume we must still farm items")
 
 		NewLowerKurastChest().Run()
 		NewMephisto(nil).Run()
 		NewMausoleum().Run()
-		err := action.WayPoint(area.ThePandemoniumFortress)
+		diabloRun := NewDiablo()
+		err = diabloRun.Run()
 		if err != nil {
 			return err
 		}
-
-		diabloRun := NewDiablo()
-		err = diabloRun.Run()
+		err := action.WayPoint(area.Harrogath)
 		if err != nil {
 			return err
 		}
@@ -296,3 +294,4 @@ func (a Leveling) CrystallinePassage() error {
 	return nil
 
 }
+
