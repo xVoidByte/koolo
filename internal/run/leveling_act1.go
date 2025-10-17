@@ -206,6 +206,7 @@ func (a Leveling) setupLevelOneConfig() {
 	a.ctx.CharacterCfg.Game.Leveling.EnabledRunewordRecipes = a.GetRunewords()
 	a.ctx.CharacterCfg.Character.UseTeleport = true
 	a.ctx.CharacterCfg.Character.UseMerc = false
+	a.ctx.CharacterCfg.Character.StashToShared = false
 	a.ctx.CharacterCfg.Game.UseCainIdentify = true
 	a.ctx.CharacterCfg.CloseMiniPanel = false
 	a.ctx.CharacterCfg.Health.HealingPotionAt = 40
@@ -536,3 +537,4 @@ func (a Leveling) shouldFarmCountessForRunes() bool {
 	a.ctx.Logger.Info("All required runes are present. Skipping Countess farm.")
 	return false
 }
+
