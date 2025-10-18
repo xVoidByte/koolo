@@ -12,6 +12,7 @@
     --bg-primary: #1a1d24;
     --bg-secondary: #22262e;
     --bg-tertiary: #2a2f38;
+    --bg-xp-bar: #2b2f36;
     --bg-hover: #32363f;
     
     /* Character Overview Colors */
@@ -277,9 +278,9 @@ body {
 }
 
 .xp-bar {
-    height: 8px;
-    background: var(--bg-primary);
-    border-radius: var(--radius-full);
+    height: 6px;
+    background: var(--bg-xp-bar);
+    border-radius: var(--radius-sm);
     overflow: hidden;
     width: 200px;
     display: inline-block;
